@@ -1,13 +1,47 @@
-from fastapi import FastAPI, HTTPException
+import asyncio
+import logging
+import uuid
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from openai import OpenAI
-from dotenv import load_dotenv
-import os
+from fastapi.staticfiles import StaticFiles
 
-load_dotenv()
+from agent.orchestrator import start_session
+from conductor.conductor import run_conductor
+from conductor.registry import (
+    get_or_create_slot,
+    remove_slot,
+    set_websocket,
+)
+from config import settings
+from db.database import get_db, init_db
+from db.repository import create_session, get_session, get_session_entries
+from interface.models import (
+    CreateSessionResponse,
+    InboundWSMessage,
+    UploadResponse,
+    entry_to_wire,
+)
+from storage.backend import LocalFileStorageBackend
 
-app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+storage = LocalFileStorageBackend()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    await init_db()
+    logger.info("Database initialized, uploads dir ready")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,32 +51,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
-class Message(BaseModel):
-    role: str
-    content: str
+# --- REST endpoints ---
 
 
-class ChatRequest(BaseModel):
-    messages: list[Message]
+@app.post("/api/sessions", response_model=CreateSessionResponse)
+async def create_session_endpoint():
+    async with get_db() as db:
+        session = await create_session(db)
+    return CreateSessionResponse(session_id=str(session.id))
 
 
-class ChatResponse(BaseModel):
-    reply: str
+@app.post("/api/upload", response_model=UploadResponse)
+async def upload_file(file: UploadFile):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file.content_type}. Allowed: {ALLOWED_IMAGE_TYPES}",
+        )
+
+    data = await file.read()
+    file_id = await storage.save(data, file.filename or "upload.bin")
+    url = storage.url_for(file_id)
+    return UploadResponse(file_id=file_id, url=url)
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not set")
+@app.get("/api/sessions/{session_id}/entries")
+async def get_entries(session_id: uuid.UUID):
+    async with get_db() as db:
+        session = await get_session(db, session_id)
+        if not session:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Session not found")
+        entries = await get_session_entries(db, session_id)
+    return [entry_to_wire(e)["entry"] for e in entries]
+
+
+# --- WebSocket ---
+
+
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
+    async with get_db() as db:
+        session = await get_session(db, session_id)
+        if not session:
+            await websocket.close(code=4004, reason="Session not found")
+            return
+
+    await websocket.accept()
+
+    slot = get_or_create_slot(session_id)
+    set_websocket(session_id, websocket)
+    conductor_task = asyncio.create_task(run_conductor(session_id, slot.queue))
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-5.2",
-            messages=[{"role": m.role, "content": m.content} for m in request.messages],
-        )
-        return ChatResponse(reply=response.choices[0].message.content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        while True:
+            raw = await websocket.receive_json()
+            msg = InboundWSMessage(**raw)
+
+            image_url = None
+            if msg.file_id:
+                image_url = storage.url_for(msg.file_id)
+
+            await start_session(session_id, msg.content, image_url)
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected for session %s", session_id)
+    finally:
+        conductor_task.cancel()
+        set_websocket(session_id, None)
+        remove_slot(session_id)
