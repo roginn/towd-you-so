@@ -88,6 +88,12 @@ async def create_uploaded_file(
     return uploaded_file
 
 
+async def get_uploaded_file(
+    db: AsyncSession, file_id: uuid.UUID
+) -> UploadedFileModel | None:
+    return await db.get(UploadedFileModel, file_id)
+
+
 async def get_uploaded_file_by_storage_key(
     db: AsyncSession, storage_key: str
 ) -> UploadedFileModel | None:

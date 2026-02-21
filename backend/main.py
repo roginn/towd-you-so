@@ -100,8 +100,6 @@ async def get_entries(session_id: uuid.UUID):
     async with get_db() as db:
         session = await get_session(db, session_id)
         if not session:
-            from fastapi import HTTPException
-
             raise HTTPException(status_code=404, detail="Session not found")
         entries = await get_session_entries(db, session_id)
     return [entry_to_wire(e)["entry"] for e in entries]
@@ -129,16 +127,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
             raw = await websocket.receive_json()
             msg = InboundWSMessage(**raw)
 
-            image_url = None
             uploaded_file_id = None
             if msg.file_id:
-                image_url = storage.url_for(msg.file_id)
                 async with get_db() as db:
                     uploaded_file = await get_uploaded_file_by_storage_key(db, msg.file_id)
                     if uploaded_file:
                         uploaded_file_id = uploaded_file.id
 
-            await start_session(session_id, msg.content, image_url, uploaded_file_id)
+            await start_session(session_id, msg.content, uploaded_file_id)
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for session %s", session_id)
     finally:

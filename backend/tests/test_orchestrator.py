@@ -6,13 +6,14 @@ from agent.llm import build_llm_messages
 from db.models import EntryKind, EntryStatus
 
 
-def _entry(kind, data, status=None):
+def _entry(kind, data, status=None, uploaded_file_id=None):
     return SimpleNamespace(
         id=uuid.uuid4(),
         session_id=uuid.uuid4(),
         kind=kind,
         data=data,
         status=status,
+        uploaded_file_id=uploaded_file_id,
         created_at=datetime.now(timezone.utc),
     )
 
@@ -27,16 +28,18 @@ def test_user_message_text_only():
 
 
 def test_user_message_with_image():
+    file_id = uuid.uuid4()
     entries = [
         _entry(
             EntryKind.USER_MESSAGE,
-            {"content": "What does this say?", "image_url": "http://example.com/sign.jpg"},
+            {"content": "What does this say?"},
+            uploaded_file_id=file_id,
         )
     ]
     messages = build_llm_messages(entries, "test system prompt")
     content = messages[1]["content"]
     assert "What does this say?" in content
-    assert "[User attached an image: http://example.com/sign.jpg]" in content
+    assert f"[User attached an image (file_id: {file_id})]" in content
 
 
 def test_tool_call_and_result():

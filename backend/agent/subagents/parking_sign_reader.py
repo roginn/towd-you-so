@@ -1,5 +1,9 @@
 import uuid
 
+PARKING_SIGN_READER_TOOLS = [
+    "ocr_parking_sign",
+]
+
 
 async def run_agent(
     uploaded_file_id: uuid.UUID | None = None,

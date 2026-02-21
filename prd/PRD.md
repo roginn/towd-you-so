@@ -104,7 +104,9 @@ Tools receive **only** the explicit parameters the LLM provides in its `tool_cal
 - The LLM is responsible for extracting values (e.g., `file_id` from the user message) and passing them as tool arguments.
 - Sub-agents receive only the parameters they need (e.g., `uploaded_file_id`), not the full conversation history. This keeps sub-agent context small and focused.
 
-Example: `read_parking_sign` requires `{ file_id: string }`. The orchestrator's system prompt and user message annotation (`[User attached an image (file_id: ...)]`) give the LLM the information it needs to supply this argument.
+**Tool naming convention:** Tools that delegate to a sub-agent (i.e., spawn an internal LLM loop) must be prefixed with `task_` (e.g., `task_read_parking_sign`). Leaf tools that perform a single operation (API call, DB query, etc.) use plain names (e.g., `ocr_parking_sign`, `get_current_time`). This makes it easy to distinguish orchestrator-level delegation from direct execution.
+
+Example: `task_read_parking_sign` requires `{ file_id: string }`. The orchestrator's system prompt and user message annotation (`[User attached an image (file_id: ...)]`) give the LLM the information it needs to supply this argument.
 
 ### 2.2.3 Interface Models (Pydantic)
 ```python

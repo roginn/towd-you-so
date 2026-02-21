@@ -6,7 +6,7 @@ from tools._registry import register
 DEFINITION = {
     "type": "function",
     "function": {
-        "name": "read_parking_sign",
+        "name": "task_read_parking_sign",
         "description": "Extract text and rules from a parking sign image.",
         "parameters": {
             "type": "object",

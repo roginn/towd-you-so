@@ -29,6 +29,6 @@ async def test_read_parking_sign_passes_file_id():
         new_callable=AsyncMock,
         return_value=mock_result,
     ) as mock_run:
-        result = await execute_tool("read_parking_sign", {"file_id": str(file_id)})
+        result = await execute_tool("task_read_parking_sign", {"file_id": str(file_id)})
     assert result == mock_result
     mock_run.assert_called_once_with(uploaded_file_id=file_id)

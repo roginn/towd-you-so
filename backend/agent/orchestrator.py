@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "You are Tow'd You So, an AI parking sign assistant. "
     "Users send you photos of parking signs and ask whether they can park. "
-    "When you receive a message with an image, call the read_parking_sign tool "
+    "When you receive a message with an image, call the task_read_parking_sign tool "
     "to extract the sign's rules. Then call get_current_time "
     "to determine the current date, time, and day of week. "
     "Use both results to give a clear yes/no/conditional answer with a brief explanation."
 )
 
 ORCHESTRATOR_TOOLS = [
-    "read_parking_sign",
+    "task_read_parking_sign",
     "get_current_time",
     "vision",
 ]
@@ -35,13 +35,10 @@ def _get_tools(names: list[str]) -> list[dict]:
 async def start_session(
     session_id: uuid.UUID,
     content: str,
-    image_url: str | None = None,
     uploaded_file_id: uuid.UUID | None = None,
 ) -> None:
     """Called when a user sends a message. Writes user_message entry and kicks off the agent loop."""
     data: dict = {"content": content}
-    if image_url:
-        data["image_url"] = image_url
 
     async with get_db() as db:
         entry = await append_entry(

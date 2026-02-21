@@ -24,9 +24,9 @@ def entry_to_wire(entry: EntryModel) -> dict:
         "entry": {
             "id": str(entry.id),
             "session_id": str(entry.session_id),
-            "kind": entry.kind.value,
+            "kind": entry.kind.value if hasattr(entry.kind, "value") else entry.kind,
             "data": entry.data,
-            "status": entry.status.value if entry.status else None,
+            "status": entry.status.value if hasattr(entry.status, "value") else entry.status,
             "created_at": entry.created_at.isoformat(),
         },
     }
