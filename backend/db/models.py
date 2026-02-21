@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, Text
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -54,9 +54,9 @@ class EntryModel(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False
     )
-    kind: Mapped[EntryKind]
+    kind: Mapped[EntryKind] = mapped_column(String(50), nullable=False)
     data: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    status: Mapped[EntryStatus | None] = mapped_column(nullable=True)
+    status: Mapped[EntryStatus | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )

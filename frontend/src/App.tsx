@@ -1,21 +1,122 @@
-import { useState, useRef, useEffect, FormEvent } from "react";
+import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Entry, isMessageEntry } from "./types";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
-import { MOCK_ENTRIES } from "./mockData";
+
+const API_BASE = "/api";
+const WS_BASE = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
 
 function App() {
-  const [entries, setEntries] = useState<Entry[]>(MOCK_ENTRIES);
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const pendingMessageRef = useRef<{ content: string; file_id?: string } | null>(null);
 
+  // Scroll to bottom when entries change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries, debugMode]);
+
+  // Load existing entries when navigating to a session
+  useEffect(() => {
+    if (!sessionId) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sessionId}/entries`);
+        if (res.ok) {
+          const data = await res.json();
+          setEntries(
+            data.map((e: any) => ({
+              id: e.id,
+              sessionId: e.session_id,
+              kind: e.kind,
+              data: e.data,
+              createdAt: e.created_at,
+            }))
+          );
+        }
+      } catch {
+        // Session may be new with no entries yet
+      }
+    })();
+  }, [sessionId]);
+
+  // WebSocket connection management
+  const connectWebSocket = useCallback(
+    (sid: string) => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+
+      const ws = new WebSocket(`${WS_BASE}/ws/${sid}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        // If we have a pending message (from session creation), send it now
+        if (pendingMessageRef.current) {
+          ws.send(JSON.stringify(pendingMessageRef.current));
+          pendingMessageRef.current = null;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === "entry") {
+          const e = msg.entry;
+          const entry: Entry = {
+            id: e.id,
+            sessionId: e.session_id,
+            kind: e.kind,
+            data: e.data,
+            createdAt: e.created_at,
+          };
+          setEntries((prev) => {
+            // Replace if entry already exists (status update), otherwise append
+            const idx = prev.findIndex((p) => p.id === entry.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = entry;
+              return updated;
+            }
+            return [...prev, entry];
+          });
+        }
+
+        if (msg.type === "turn_complete") {
+          setLoading(false);
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+      };
+
+      ws.onerror = () => {
+        setLoading(false);
+      };
+    },
+    []
+  );
+
+  // Connect WebSocket when sessionId is available
+  useEffect(() => {
+    if (!sessionId) return;
+    connectWebSocket(sessionId);
+    return () => {
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [sessionId, connectWebSocket]);
 
   const visibleEntries = debugMode
     ? entries
@@ -42,82 +143,80 @@ function App() {
     const text = input.trim();
     if ((!text && !pendingFile) || loading) return;
 
-    let imageUrl: string | undefined;
+    setInput("");
+    setLoading(true);
 
+    let fileId: string | undefined;
+
+    // Upload file if attached
     if (pendingFile) {
       try {
         const formData = new FormData();
         formData.append("file", pendingFile.file);
-        const uploadRes = await fetch("http://localhost:8000/api/upload", {
+        const uploadRes = await fetch(`${API_BASE}/upload`, {
           method: "POST",
           body: formData,
         });
         if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
         const uploadData = await uploadRes.json();
-        imageUrl = uploadData.url;
+        fileId = uploadData.file_id;
       } catch (err) {
-        // Fall back to local preview if upload fails
-        imageUrl = pendingFile.preview;
+        setLoading(false);
+        setEntries((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            sessionId: sessionId || "",
+            kind: "assistant_message",
+            data: { content: `Error uploading image: ${err instanceof Error ? err.message : "Unknown error"}` },
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+        return;
       }
       clearPendingFile();
     }
 
-    const userEntry: Entry = {
-      id: crypto.randomUUID(),
-      sessionId: "",
-      kind: "user_message",
-      data: { content: text, ...(imageUrl ? { image_url: imageUrl } : {}) },
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...entries, userEntry];
-    setEntries(updated);
-    setInput("");
-    setLoading(true);
+    const wsMessage = { content: text || "", ...(fileId ? { file_id: fileId } : {}) };
 
-    try {
-      const res = await fetch("http://localhost:8000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: updated
-            .filter((e) => isMessageEntry(e.kind))
-            .map((e) => ({
-              role: e.kind === "user_message" ? "user" : "assistant",
-              content: (e.data as { content: string }).content,
-            })),
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
+    if (!sessionId) {
+      // No session yet — create one, then navigate (which triggers WS connection)
+      try {
+        const res = await fetch(`${API_BASE}/sessions`, { method: "POST" });
+        if (!res.ok) throw new Error(`Failed to create session: ${res.status}`);
+        const data = await res.json();
+        pendingMessageRef.current = wsMessage;
+        navigate(`/chat/${data.session_id}`, { replace: true });
+      } catch (err) {
+        setLoading(false);
+        setEntries((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            sessionId: "",
+            kind: "assistant_message",
+            data: { content: `Error: ${err instanceof Error ? err.message : "Unknown error"}` },
+            createdAt: new Date().toISOString(),
+          },
+        ]);
       }
-
-      const data = await res.json();
-      setEntries([
-        ...updated,
-        {
-          id: crypto.randomUUID(),
-          sessionId: "",
-          kind: "assistant_message",
-          data: { content: data.reply },
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error";
-      setEntries([
-        ...updated,
-        {
-          id: crypto.randomUUID(),
-          sessionId: "",
-          kind: "assistant_message",
-          data: { content: `Error: ${errorMessage}` },
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setLoading(false);
+    } else {
+      // Session exists — send via WebSocket
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(wsMessage));
+      } else {
+        setLoading(false);
+        setEntries((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            sessionId,
+            kind: "assistant_message",
+            data: { content: "Error: Connection lost. Please refresh the page." },
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
     }
   };
 
@@ -136,7 +235,7 @@ function App() {
       </header>
       <div className="messages">
         {entries.length === 0 && (
-          <div className="empty-state">Send a message to start chatting</div>
+          <div className="empty-state">Send a photo of a parking sign to get started</div>
         )}
         {visibleEntries.map((entry) =>
           isMessageEntry(entry.kind) ? (

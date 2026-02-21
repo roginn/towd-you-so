@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
 
 from agent.orchestrator import start_session
 from conductor.conductor import run_conductor
@@ -66,8 +68,6 @@ async def create_session_endpoint():
 @app.post("/api/upload", response_model=UploadResponse)
 async def upload_file(file: UploadFile):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type: {file.content_type}. Allowed: {ALLOWED_IMAGE_TYPES}",
