@@ -1,7 +1,7 @@
 import sys
+import uuid
 
 from tools._registry import register
-from tools.context import ToolContext
 
 DEFINITION = {
     "type": "function",
@@ -10,7 +10,13 @@ DEFINITION = {
         "description": "Extract text and rules from a parking sign image.",
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "file_id": {
+                    "type": "string",
+                    "description": "The uploaded file ID of the parking sign image.",
+                },
+            },
+            "required": ["file_id"],
         },
     },
 }
@@ -18,14 +24,8 @@ DEFINITION = {
 register(DEFINITION, sys.modules[__name__])
 
 
-async def run(context: ToolContext | None = None, **kwargs) -> dict:
+async def run(*, file_id: str, **kwargs) -> dict:
     """Delegate to the parking sign reader sub-agent."""
     from agent.subagents.parking_sign_reader import run_agent
 
-    if context is None:
-        return {"error": "No context provided to read_parking_sign"}
-
-    return await run_agent(
-        entries=context.entries,
-        uploaded_file_id=context.uploaded_file_id,
-    )
+    return await run_agent(uploaded_file_id=uuid.UUID(file_id))

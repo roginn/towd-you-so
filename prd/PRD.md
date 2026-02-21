@@ -96,7 +96,17 @@ backend/
 └── requirements.txt
 ```
 
-### 2.2.2 Interface Models (Pydantic)
+### 2.2.2 Tool Execution Model
+
+Tools receive **only** the explicit parameters the LLM provides in its `tool_calls` arguments — no implicit context. The conductor is a dumb executor: it dispatches `tool_name` + `arguments` and writes the result.
+
+- Tools must declare all required inputs in their function `parameters` schema so the LLM knows to supply them.
+- The LLM is responsible for extracting values (e.g., `file_id` from the user message) and passing them as tool arguments.
+- Sub-agents receive only the parameters they need (e.g., `uploaded_file_id`), not the full conversation history. This keeps sub-agent context small and focused.
+
+Example: `read_parking_sign` requires `{ file_id: string }`. The orchestrator's system prompt and user message annotation (`[User attached an image (file_id: ...)]`) give the LLM the information it needs to supply this argument.
+
+### 2.2.3 Interface Models (Pydantic)
 ```python
 class EntryKind(str, Enum):
     USER_MESSAGE = "user_message"

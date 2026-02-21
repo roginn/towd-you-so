@@ -55,35 +55,30 @@ def build_llm_messages(entries: list, system_prompt: str) -> list[dict]:
         data = entry.data
 
         if kind == EntryKind.USER_MESSAGE:
-            content_parts = []
-            if data.get("content"):
-                content_parts.append({"type": "text", "text": data["content"]})
-            if data.get("image_url"):
-                content_parts.append(
-                    {"type": "image_url", "image_url": {"url": data["image_url"]}}
-                )
-            messages.append({"role": "user", "content": content_parts})
+            text = data.get("content", "")
+            if entry.uploaded_file_id:
+                text += f"\n[User attached an image (file_id: {entry.uploaded_file_id})]"
+            messages.append({"role": "user", "content": text})
 
         elif kind == EntryKind.ASSISTANT_MESSAGE:
             messages.append({"role": "assistant", "content": data["content"]})
 
         elif kind == EntryKind.TOOL_CALL:
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {
-                            "id": data["call_id"],
-                            "type": "function",
-                            "function": {
-                                "name": data["tool_name"],
-                                "arguments": json.dumps(data["arguments"]),
-                            },
-                        }
-                    ],
-                }
-            )
+            tc_obj = {
+                "id": data["call_id"],
+                "type": "function",
+                "function": {
+                    "name": data["tool_name"],
+                    "arguments": json.dumps(data["arguments"]),
+                },
+            }
+            # Group consecutive tool_calls into a single assistant message
+            if messages and messages[-1].get("tool_calls"):
+                messages[-1]["tool_calls"].append(tc_obj)
+            else:
+                messages.append(
+                    {"role": "assistant", "content": None, "tool_calls": [tc_obj]}
+                )
 
         elif kind == EntryKind.TOOL_RESULT:
             messages.append(
