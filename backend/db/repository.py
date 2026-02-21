@@ -9,6 +9,7 @@ from db.models import (
     EntryModel,
     EntryStatus,
     SessionModel,
+    UploadedFileModel,
 )
 
 
@@ -30,9 +31,16 @@ async def append_entry(
     session_id: uuid.UUID,
     kind: EntryKind,
     data: dict,
+    uploaded_file_id: uuid.UUID | None = None,
 ) -> EntryModel:
     status = EntryStatus.PENDING if kind in EXECUTABLE_KINDS else None
-    entry = EntryModel(session_id=session_id, kind=kind, data=data, status=status)
+    entry = EntryModel(
+        session_id=session_id,
+        kind=kind,
+        data=data,
+        status=status,
+        uploaded_file_id=uploaded_file_id,
+    )
     db.add(entry)
     await db.flush()
     return entry
@@ -60,3 +68,30 @@ async def get_session_entries(
 
 async def get_entry(db: AsyncSession, entry_id: uuid.UUID) -> EntryModel | None:
     return await db.get(EntryModel, entry_id)
+
+
+async def create_uploaded_file(
+    db: AsyncSession,
+    storage_key: str,
+    original_filename: str,
+    mime_type: str,
+    size_bytes: int,
+) -> UploadedFileModel:
+    uploaded_file = UploadedFileModel(
+        storage_key=storage_key,
+        original_filename=original_filename,
+        mime_type=mime_type,
+        size_bytes=size_bytes,
+    )
+    db.add(uploaded_file)
+    await db.flush()
+    return uploaded_file
+
+
+async def get_uploaded_file_by_storage_key(
+    db: AsyncSession, storage_key: str
+) -> UploadedFileModel | None:
+    result = await db.execute(
+        select(UploadedFileModel).where(UploadedFileModel.storage_key == storage_key)
+    )
+    return result.scalar_one_or_none()

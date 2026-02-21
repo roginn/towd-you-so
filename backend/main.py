@@ -19,7 +19,13 @@ from conductor.registry import (
 )
 from config import settings
 from db.database import get_db
-from db.repository import create_session, get_session, get_session_entries
+from db.repository import (
+    create_session,
+    create_uploaded_file,
+    get_session,
+    get_session_entries,
+    get_uploaded_file_by_storage_key,
+)
 from interface.models import (
     CreateSessionResponse,
     InboundWSMessage,
@@ -74,9 +80,19 @@ async def upload_file(file: UploadFile):
         )
 
     data = await file.read()
-    file_id = await storage.save(data, file.filename or "upload.bin")
-    url = storage.url_for(file_id)
-    return UploadResponse(file_id=file_id, url=url)
+    storage_key = await storage.save(data, file.filename or "upload.bin")
+    url = storage.url_for(storage_key)
+
+    async with get_db() as db:
+        await create_uploaded_file(
+            db,
+            storage_key=storage_key,
+            original_filename=file.filename or "upload.bin",
+            mime_type=file.content_type or "application/octet-stream",
+            size_bytes=len(data),
+        )
+
+    return UploadResponse(file_id=storage_key, url=url)
 
 
 @app.get("/api/sessions/{session_id}/entries")
@@ -114,10 +130,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
             msg = InboundWSMessage(**raw)
 
             image_url = None
+            uploaded_file_id = None
             if msg.file_id:
                 image_url = storage.url_for(msg.file_id)
+                async with get_db() as db:
+                    uploaded_file = await get_uploaded_file_by_storage_key(db, msg.file_id)
+                    if uploaded_file:
+                        uploaded_file_id = uploaded_file.id
 
-            await start_session(session_id, msg.content, image_url)
+            await start_session(session_id, msg.content, image_url, uploaded_file_id)
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for session %s", session_id)
     finally:

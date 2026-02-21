@@ -25,7 +25,10 @@ SYSTEM_PROMPT = (
 
 
 async def start_session(
-    session_id: uuid.UUID, content: str, image_url: str | None = None
+    session_id: uuid.UUID,
+    content: str,
+    image_url: str | None = None,
+    uploaded_file_id: uuid.UUID | None = None,
 ) -> None:
     """Called when a user sends a message. Writes user_message entry and kicks off the agent loop."""
     data: dict = {"content": content}
@@ -33,7 +36,10 @@ async def start_session(
         data["image_url"] = image_url
 
     async with get_db() as db:
-        entry = await append_entry(db, session_id, EntryKind.USER_MESSAGE, data)
+        entry = await append_entry(
+            db, session_id, EntryKind.USER_MESSAGE, data,
+            uploaded_file_id=uploaded_file_id,
+        )
 
     await push_to_client(session_id, entry_to_wire(entry))
     await continue_session(session_id)

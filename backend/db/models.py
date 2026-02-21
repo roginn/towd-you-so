@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import BigInteger, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -45,6 +45,23 @@ class SessionModel(Base):
     )
 
 
+class UploadedFileModel(Base):
+    __tablename__ = "uploaded_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    storage_key: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
 class EntryModel(Base):
     __tablename__ = "entries"
 
@@ -53,6 +70,9 @@ class EntryModel(Base):
     )
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False
+    )
+    uploaded_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("uploaded_files.id"), nullable=True
     )
     kind: Mapped[EntryKind] = mapped_column(String(50), nullable=False)
     data: Mapped[dict] = mapped_column(JSONB, nullable=False)
