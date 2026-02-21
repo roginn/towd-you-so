@@ -35,6 +35,25 @@ body {
   font-weight: 600;
 }
 
+.new-chat-btn {
+  position: absolute;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  color: #007aff;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.new-chat-btn:hover {
+  background: #f0f0f0;
+}
+
 .debug-toggle {
   position: absolute;
   right: 16px;
