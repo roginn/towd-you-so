@@ -23,7 +23,7 @@ def test_user_message_text_only():
     assert messages[0]["role"] == "system"
     user_msg = messages[1]
     assert user_msg["role"] == "user"
-    assert user_msg["content"] == [{"type": "text", "text": "Can I park here?"}]
+    assert user_msg["content"] == "Can I park here?"
 
 
 def test_user_message_with_image():
@@ -34,11 +34,9 @@ def test_user_message_with_image():
         )
     ]
     messages = build_llm_messages(entries, "test system prompt")
-    parts = messages[1]["content"]
-    assert len(parts) == 2
-    assert parts[0]["type"] == "text"
-    assert parts[1]["type"] == "image_url"
-    assert parts[1]["image_url"]["url"] == "http://example.com/sign.jpg"
+    content = messages[1]["content"]
+    assert "What does this say?" in content
+    assert "[User attached an image: http://example.com/sign.jpg]" in content
 
 
 def test_tool_call_and_result():
