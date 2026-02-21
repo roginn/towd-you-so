@@ -11,5 +11,4 @@ python-multipart
 aiofiles
 pytest
 pytest-asyncio
-aiosqlite
 httpx

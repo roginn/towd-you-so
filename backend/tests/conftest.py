@@ -2,35 +2,19 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import JSON, String, event
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.ext.compiler import compiles
 
 from db.models import Base, SessionModel
 
-# ---------------------------------------------------------------------------
-# SQLite compatibility shims for PostgreSQL-specific column types
-# ---------------------------------------------------------------------------
-
-@compiles(JSONB, "sqlite")
-def _compile_jsonb_sqlite(type_, compiler, **kw):
-    return compiler.visit_JSON(JSON(), **kw)
-
-
-# UUID(as_uuid=True) → CHAR(36) on SQLite
-@compiles(UUID, "sqlite")
-def _compile_uuid_sqlite(type_, compiler, **kw):
-    return "CHAR(36)"
-
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost/towdyouso_test"
 
 # ---------------------------------------------------------------------------
-# Async SQLite engine + session fixtures
+# Async PostgreSQL engine + session fixtures
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture
 async def db_engine():
-    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -75,4 +59,3 @@ async def override_get_db(db_session: AsyncSession, monkeypatch):
     monkeypatch.setattr(main, "get_db", _fake_get_db)
     monkeypatch.setattr(agent.orchestrator, "get_db", _fake_get_db)
     monkeypatch.setattr(conductor.conductor, "get_db", _fake_get_db)
-
