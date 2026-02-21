@@ -1,6 +1,7 @@
 import sys
 
 from tools._registry import register
+from tools.context import ToolContext
 
 DEFINITION = {
     "type": "function",
@@ -9,13 +10,7 @@ DEFINITION = {
         "description": "Extract text and rules from a parking sign image.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "image_url": {
-                    "type": "string",
-                    "description": "URL of the parking sign image",
-                }
-            },
-            "required": ["image_url"],
+            "properties": {},
         },
     },
 }
@@ -23,8 +18,14 @@ DEFINITION = {
 register(DEFINITION, sys.modules[__name__])
 
 
-async def run(**kwargs) -> dict:
+async def run(context: ToolContext | None = None, **kwargs) -> dict:
     """Delegate to the parking sign reader sub-agent."""
     from agent.subagents.parking_sign_reader import run_agent
 
-    return await run_agent(**kwargs)
+    if context is None:
+        return {"error": "No context provided to read_parking_sign"}
+
+    return await run_agent(
+        entries=context.entries,
+        uploaded_file_id=context.uploaded_file_id,
+    )

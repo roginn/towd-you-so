@@ -1,8 +1,10 @@
 import json
 import logging
+import uuid
 
 from agent.llm import LLMResponse, call_llm
 from conductor.tool_executor import execute_tool
+from db.models import EntryModel
 from tools import TOOL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
@@ -21,9 +23,12 @@ def _get_tools(names: list[str]) -> list[dict]:
     return [d for d in TOOL_DEFINITIONS if d["function"]["name"] in names]
 
 
-async def run_agent(**kwargs) -> dict:
+async def run_agent(
+    entries: list[EntryModel] | None = None,
+    uploaded_file_id: uuid.UUID | None = None,
+) -> dict:
     """Run an internal LLM loop to analyze a parking sign image."""
-    image_url = kwargs.get("image_url", "")
+    image_url = ""
 
     messages: list[dict] = [
         {"role": "system", "content": SYSTEM_PROMPT},

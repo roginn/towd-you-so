@@ -6,8 +6,9 @@ from conductor.registry import push_to_client
 from conductor.tool_executor import execute_tool
 from db.database import get_db
 from db.models import EntryKind, EntryStatus
-from db.repository import append_entry, get_entry, mark_entry_status
+from db.repository import append_entry, get_entry, get_session_entries, mark_entry_status
 from interface.models import entry_to_wire
+from tools.context import ToolContext
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,23 @@ async def _process_entry(session_id: uuid.UUID, entry_id: uuid.UUID) -> None:
 
     try:
         if entry.kind == EntryKind.TOOL_CALL:
+            # Build ToolContext from session data
+            async with get_db() as db:
+                entries = await get_session_entries(db, session_id)
+
+            uploaded_file_id = None
+            for e in entries:
+                if e.kind == EntryKind.USER_MESSAGE and e.uploaded_file_id is not None:
+                    uploaded_file_id = e.uploaded_file_id
+
+            context = ToolContext(
+                session_id=session_id,
+                entries=entries,
+                uploaded_file_id=uploaded_file_id,
+            )
+
             result = await execute_tool(
-                entry.data["tool_name"], entry.data.get("arguments", {})
+                entry.data["tool_name"], entry.data.get("arguments", {}), context=context
             )
             result_kind = EntryKind.TOOL_RESULT
             result_data = {"call_id": entry.data["call_id"], "result": result}
