@@ -6,7 +6,6 @@ from openai import AsyncOpenAI
 
 from config import settings
 from db.models import EntryKind
-from tools import TOOL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +24,11 @@ class LLMResponse:
     tool_calls: list[ToolCallResult] | None = None
 
 
-async def call_llm(messages: list[dict]) -> LLMResponse:
-    response = await openai_client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=messages,
-        tools=TOOL_DEFINITIONS,
-    )
+async def call_llm(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
+    kwargs = {"model": settings.OPENAI_MODEL, "messages": messages}
+    if tools:
+        kwargs["tools"] = tools
+    response = await openai_client.chat.completions.create(**kwargs)
     choice = response.choices[0]
 
     if choice.finish_reason == "tool_calls" or choice.message.tool_calls:

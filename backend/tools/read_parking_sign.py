@@ -24,5 +24,7 @@ register(DEFINITION, sys.modules[__name__])
 
 
 async def run(**kwargs) -> dict:
-    """Stub: read parking sign text from an image."""
-    return {"text": "No parking Mon-Fri 8am-6pm. 2 hour parking Sat-Sun."}
+    """Delegate to the parking sign reader sub-agent."""
+    from agent.subagents.parking_sign_reader import run_agent
+
+    return await run_agent(**kwargs)

@@ -8,15 +8,28 @@ from db.repository import append_entry, get_session_entries
 from interface.models import entry_to_wire
 
 from agent.llm import build_llm_messages, call_llm
+from tools import TOOL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are Tow'd You So, an AI parking sign assistant. "
     "Users send you photos of parking signs and ask whether they can park. "
-    "Use the provided tools to read the sign and determine the current time, "
-    "then give a clear yes/no/conditional answer with a brief explanation."
+    "When you receive a message with an image, call the read_parking_sign tool "
+    "with the image URL to extract the sign's rules. Then call get_current_time "
+    "to determine the current date, time, and day of week. "
+    "Use both results to give a clear yes/no/conditional answer with a brief explanation."
 )
+
+ORCHESTRATOR_TOOLS = [
+    "read_parking_sign",
+    "get_current_time",
+    "vision",
+]
+
+
+def _get_tools(names: list[str]) -> list[dict]:
+    return [d for d in TOOL_DEFINITIONS if d["function"]["name"] in names]
 
 
 async def start_session(
@@ -48,7 +61,7 @@ async def continue_session(session_id: uuid.UUID) -> None:
     messages = build_llm_messages(entries, SYSTEM_PROMPT)
 
     try:
-        llm_response = await call_llm(messages)
+        llm_response = await call_llm(messages, tools=_get_tools(ORCHESTRATOR_TOOLS))
     except Exception:
         logger.exception("LLM call failed for session %s", session_id)
         async with get_db() as db:
