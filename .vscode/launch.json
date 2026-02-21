@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: Uvicorn",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--reload"],
+      "cwd": "${workspaceFolder}/backend",
+      "python": "/Users/roger/code/towd-you-so/backend/venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "/Users/roger/code/towd-you-so/backend/venv",
+        "PATH": "/Users/roger/code/towd-you-so/backend/venv/bin:${env:PATH}"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}
