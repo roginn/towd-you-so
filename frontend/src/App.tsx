@@ -1,24 +1,38 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
-import { Message } from "./types";
+import { Entry, isMessageEntry } from "./types";
+import { MessageBubble } from "./components/MessageBubble";
+import { EventCard } from "./components/EventCard";
+import { MOCK_ENTRIES } from "./mockData";
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [entries, setEntries] = useState<Entry[]>(MOCK_ENTRIES);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [entries, debugMode]);
+
+  const visibleEntries = debugMode
+    ? entries
+    : entries.filter((e) => isMessageEntry(e.kind));
 
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMessage: Message = { role: "user", content: text };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const userEntry: Entry = {
+      id: crypto.randomUUID(),
+      sessionId: "",
+      kind: "user_message",
+      data: { content: text },
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...entries, userEntry];
+    setEntries(updated);
     setInput("");
     setLoading(true);
 
@@ -26,7 +40,14 @@ function App() {
       const res = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({
+          messages: updated
+            .filter((e) => isMessageEntry(e.kind))
+            .map((e) => ({
+              role: e.kind === "user_message" ? "user" : "assistant",
+              content: (e.data as { content: string }).content,
+            })),
+        }),
       });
 
       if (!res.ok) {
@@ -34,12 +55,28 @@ function App() {
       }
 
       const data = await res.json();
-      setMessages([...updatedMessages, { role: "assistant", content: data.reply }]);
+      setEntries([
+        ...updated,
+        {
+          id: crypto.randomUUID(),
+          sessionId: "",
+          kind: "assistant_message",
+          data: { content: data.reply },
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setMessages([
-        ...updatedMessages,
-        { role: "assistant", content: `Error: ${errorMessage}` },
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error";
+      setEntries([
+        ...updated,
+        {
+          id: crypto.randomUUID(),
+          sessionId: "",
+          kind: "assistant_message",
+          data: { content: `Error: ${errorMessage}` },
+          createdAt: new Date().toISOString(),
+        },
       ]);
     } finally {
       setLoading(false);
@@ -50,16 +87,26 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>Tow'd You So</h1>
+        <label className="debug-toggle">
+          <input
+            type="checkbox"
+            checked={debugMode}
+            onChange={(e) => setDebugMode(e.target.checked)}
+          />
+          Debug
+        </label>
       </header>
       <div className="messages">
-        {messages.length === 0 && (
+        {entries.length === 0 && (
           <div className="empty-state">Send a message to start chatting</div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`message ${msg.role}`}>
-            <div className="bubble">{msg.content}</div>
-          </div>
-        ))}
+        {visibleEntries.map((entry) =>
+          isMessageEntry(entry.kind) ? (
+            <MessageBubble key={entry.id} entry={entry} />
+          ) : (
+            <EventCard key={entry.id} entry={entry} />
+          )
+        )}
         {loading && (
           <div className="message assistant">
             <div className="bubble loading-bubble">

@@ -21,15 +21,34 @@ body {
 
 .header {
   padding: 16px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-bottom: 1px solid #e0e0e0;
   background: #fff;
   flex-shrink: 0;
+  position: relative;
 }
 
 .header h1 {
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.debug-toggle {
+  position: absolute;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #666;
+  cursor: pointer;
+  user-select: none;
+}
+
+.debug-toggle input {
+  cursor: pointer;
 }
 
 .messages {
@@ -140,6 +159,61 @@ body {
 .input-bar button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Event cards (debug entries) */
+.event-card {
+  margin: 2px 16px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border: 1px dashed #d0d0d0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #777;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.event-card:hover {
+  background: #f0f0f0;
+}
+
+.event-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-icon {
+  font-size: 0.9rem;
+}
+
+.event-label {
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.event-expand {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: #aaa;
+}
+
+.event-card-body {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
+  color: #555;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 @media (max-width: 600px) {
