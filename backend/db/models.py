@@ -41,7 +41,7 @@ class SessionModel(Base):
         UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=True
     )
     started_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
 
@@ -58,5 +58,5 @@ class EntryModel(Base):
     data: Mapped[dict] = mapped_column(JSONB, nullable=False)
     status: Mapped[EntryStatus | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
