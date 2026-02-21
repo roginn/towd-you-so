@@ -7,3 +7,7 @@ asyncpg
 pydantic-settings
 python-multipart
 aiofiles
+pytest
+pytest-asyncio
+aiosqlite
+httpx
