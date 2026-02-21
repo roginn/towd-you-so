@@ -1,20 +1,15 @@
-import json
 import logging
 import uuid
 
-from openai import AsyncOpenAI
-
 from conductor.registry import enqueue_entry, push_to_client
-from config import settings
-from tools import TOOL_DEFINITIONS
 from db.database import get_db
 from db.models import EntryKind
 from db.repository import append_entry, get_session_entries
 from interface.models import entry_to_wire
 
-logger = logging.getLogger(__name__)
+from agent.llm import build_llm_messages, call_llm
 
-openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are Tow'd You So, an AI parking sign assistant. "
@@ -50,14 +45,10 @@ async def continue_session(session_id: uuid.UUID) -> None:
     async with get_db() as db:
         entries = await get_session_entries(db, session_id)
 
-    messages = _build_llm_messages(entries)
+    messages = build_llm_messages(entries, SYSTEM_PROMPT)
 
     try:
-        response = await openai_client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            messages=messages,
-            tools=TOOL_DEFINITIONS,
-        )
+        llm_response = await call_llm(messages)
     except Exception:
         logger.exception("LLM call failed for session %s", session_id)
         async with get_db() as db:
@@ -71,15 +62,12 @@ async def continue_session(session_id: uuid.UUID) -> None:
         await push_to_client(session_id, {"type": "turn_complete"})
         return
 
-    choice = response.choices[0]
-
-    if choice.finish_reason == "tool_calls" or choice.message.tool_calls:
-        # LLM wants to call tools
-        for tc in choice.message.tool_calls:
+    if llm_response.tool_calls:
+        for tc in llm_response.tool_calls:
             tool_data = {
-                "call_id": tc.id,
-                "tool_name": tc.function.name,
-                "arguments": json.loads(tc.function.arguments),
+                "call_id": tc.call_id,
+                "tool_name": tc.tool_name,
+                "arguments": tc.arguments,
             }
             async with get_db() as db:
                 entry = await append_entry(
@@ -88,68 +76,12 @@ async def continue_session(session_id: uuid.UUID) -> None:
             await push_to_client(session_id, entry_to_wire(entry))
             enqueue_entry(session_id, entry.id)
     else:
-        # LLM returned a final response
-        content = choice.message.content or ""
         async with get_db() as db:
             entry = await append_entry(
                 db,
                 session_id,
                 EntryKind.ASSISTANT_MESSAGE,
-                {"content": content},
+                {"content": llm_response.content},
             )
         await push_to_client(session_id, entry_to_wire(entry))
         await push_to_client(session_id, {"type": "turn_complete"})
-
-
-def _build_llm_messages(entries: list) -> list[dict]:
-    """Map Entry rows to OpenAI chat message format per PRD §2.3.6."""
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    for entry in entries:
-        kind = entry.kind
-        data = entry.data
-
-        if kind == EntryKind.USER_MESSAGE:
-            content_parts = []
-            if data.get("content"):
-                content_parts.append({"type": "text", "text": data["content"]})
-            if data.get("image_url"):
-                content_parts.append(
-                    {"type": "image_url", "image_url": {"url": data["image_url"]}}
-                )
-            messages.append({"role": "user", "content": content_parts})
-
-        elif kind == EntryKind.ASSISTANT_MESSAGE:
-            messages.append({"role": "assistant", "content": data["content"]})
-
-        elif kind == EntryKind.TOOL_CALL:
-            # Represent as an assistant message with tool_calls
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {
-                            "id": data["call_id"],
-                            "type": "function",
-                            "function": {
-                                "name": data["tool_name"],
-                                "arguments": json.dumps(data["arguments"]),
-                            },
-                        }
-                    ],
-                }
-            )
-
-        elif kind == EntryKind.TOOL_RESULT:
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": data["call_id"],
-                    "content": json.dumps(data["result"]),
-                }
-            )
-
-        # reasoning, sub_agent_call, sub_agent_result are excluded
-
-    return messages

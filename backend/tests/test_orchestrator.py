@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from agent.orchestrator import _build_llm_messages
+from agent.llm import build_llm_messages
 from db.models import EntryKind, EntryStatus
 
 
@@ -19,7 +19,7 @@ def _entry(kind, data, status=None):
 
 def test_user_message_text_only():
     entries = [_entry(EntryKind.USER_MESSAGE, {"content": "Can I park here?"})]
-    messages = _build_llm_messages(entries)
+    messages = build_llm_messages(entries, "test system prompt")
     assert messages[0]["role"] == "system"
     user_msg = messages[1]
     assert user_msg["role"] == "user"
@@ -33,7 +33,7 @@ def test_user_message_with_image():
             {"content": "What does this say?", "image_url": "http://example.com/sign.jpg"},
         )
     ]
-    messages = _build_llm_messages(entries)
+    messages = build_llm_messages(entries, "test system prompt")
     parts = messages[1]["content"]
     assert len(parts) == 2
     assert parts[0]["type"] == "text"
@@ -53,7 +53,7 @@ def test_tool_call_and_result():
             {"call_id": "c1", "result": {"datetime": "2025-01-01T00:00:00"}},
         ),
     ]
-    messages = _build_llm_messages(entries)
+    messages = build_llm_messages(entries, "test system prompt")
     # system + tool_call + tool_result = 3
     assert len(messages) == 3
     assert messages[1]["role"] == "assistant"
@@ -70,7 +70,7 @@ def test_skips_reasoning_and_sub_agent():
         _entry(EntryKind.SUB_AGENT_RESULT, {"result": {}}),
         _entry(EntryKind.USER_MESSAGE, {"content": "hi"}),
     ]
-    messages = _build_llm_messages(entries)
+    messages = build_llm_messages(entries, "test system prompt")
     # system + user_message only
     assert len(messages) == 2
     assert messages[1]["role"] == "user"
