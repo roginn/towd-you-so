@@ -16,7 +16,7 @@ from conductor.registry import (
     set_websocket,
 )
 from config import settings
-from db.database import get_db, init_db
+from db.database import get_db
 from db.repository import create_session, get_session, get_session_entries
 from interface.models import (
     CreateSessionResponse,
@@ -36,8 +36,7 @@ storage = LocalFileStorageBackend()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    await init_db()
-    logger.info("Database initialized, uploads dir ready")
+    logger.info("Uploads dir ready (run 'alembic upgrade head' to apply migrations)")
     yield
 
 

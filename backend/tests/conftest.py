@@ -76,9 +76,3 @@ async def override_get_db(db_session: AsyncSession, monkeypatch):
     monkeypatch.setattr(agent.orchestrator, "get_db", _fake_get_db)
     monkeypatch.setattr(conductor.conductor, "get_db", _fake_get_db)
 
-    # Patch init_db to no-op so the FastAPI lifespan doesn't hit PostgreSQL
-    async def _fake_init_db():
-        pass
-
-    monkeypatch.setattr(db.database, "init_db", _fake_init_db)
-    monkeypatch.setattr(main, "init_db", _fake_init_db)

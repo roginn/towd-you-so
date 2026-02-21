@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 
 from conductor.registry import enqueue_entry, push_to_client
 from config import settings
+from tools import TOOL_DEFINITIONS
 from db.database import get_db
 from db.models import EntryKind
 from db.repository import append_entry, get_session_entries
@@ -21,51 +22,6 @@ SYSTEM_PROMPT = (
     "Use the provided tools to read the sign and determine the current time, "
     "then give a clear yes/no/conditional answer with a brief explanation."
 )
-
-TOOL_DEFINITIONS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_parking_sign",
-            "description": "Extract text and rules from a parking sign image.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "image_url": {
-                        "type": "string",
-                        "description": "URL of the parking sign image",
-                    }
-                },
-                "required": ["image_url"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_time",
-            "description": "Get the current date, time, and day of week.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "vision",
-            "description": "Get a general-purpose description of an image.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "image_url": {
-                        "type": "string",
-                        "description": "URL of the image to describe",
-                    }
-                },
-                "required": ["image_url"],
-            },
-        },
-    },
-]
 
 
 async def start_session(

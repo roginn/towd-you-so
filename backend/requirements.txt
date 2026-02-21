@@ -4,6 +4,8 @@ openai
 python-dotenv
 sqlalchemy[asyncio]
 asyncpg
+alembic
+psycopg2-binary
 pydantic-settings
 python-multipart
 aiofiles
