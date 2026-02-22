@@ -128,13 +128,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
             msg = InboundWSMessage(**raw)
 
             uploaded_file_id = None
+            image_url = None
             if msg.file_id:
+                image_url = storage.url_for(msg.file_id)
                 async with get_db() as db:
                     uploaded_file = await get_uploaded_file_by_storage_key(db, msg.file_id)
                     if uploaded_file:
                         uploaded_file_id = uploaded_file.id
 
-            await start_session(session_id, msg.content, uploaded_file_id)
+            await start_session(session_id, msg.content, uploaded_file_id, image_url)
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for session %s", session_id)
     finally:

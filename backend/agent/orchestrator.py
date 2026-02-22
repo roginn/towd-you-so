@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from conductor.registry import enqueue_entry, push_to_client
+from conductor.registry import enqueue_entry, push_to_client, register_batch
 from db.database import get_db
 from db.models import EntryKind
 from db.repository import append_entry, get_session_entries
@@ -36,9 +36,12 @@ async def start_session(
     session_id: uuid.UUID,
     content: str,
     uploaded_file_id: uuid.UUID | None = None,
+    image_url: str | None = None,
 ) -> None:
     """Called when a user sends a message. Writes user_message entry and kicks off the agent loop."""
     data: dict = {"content": content}
+    if image_url:
+        data["image_url"] = image_url
 
     async with get_db() as db:
         entry = await append_entry(
@@ -73,6 +76,7 @@ async def continue_session(session_id: uuid.UUID) -> None:
         return
 
     if llm_response.tool_calls:
+        register_batch(session_id, [tc.call_id for tc in llm_response.tool_calls])
         for tc in llm_response.tool_calls:
             tool_data = {
                 "call_id": tc.call_id,
