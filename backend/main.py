@@ -43,6 +43,11 @@ storage = LocalFileStorageBackend()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not Path("config.py").exists():
+        raise RuntimeError(
+            "Server must be started from the backend/ directory. "
+            f"Current directory: {Path.cwd()}"
+        )
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     logger.info("Uploads dir ready (run 'alembic upgrade head' to apply migrations)")
     yield
