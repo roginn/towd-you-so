@@ -30,7 +30,7 @@ const STATUS_INDICATOR: Record<string, string> = {
   failed: "\u274C",    // X
 };
 
-function formatCallBody(kind: EntryKind, data: Entry["data"]): string {
+export function formatCallBody(kind: EntryKind, data: Entry["data"]): string {
   switch (kind) {
     case "tool_call": {
       const d = data as ToolCallData;
@@ -48,7 +48,7 @@ function formatCallBody(kind: EntryKind, data: Entry["data"]): string {
   }
 }
 
-function formatResultBody(kind: EntryKind, data: Entry["data"]): string {
+export function formatResultBody(kind: EntryKind, data: Entry["data"]): string {
   switch (kind) {
     case "tool_result": {
       const d = data as ToolResultData;

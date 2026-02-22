@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Entry, ToolCallData, SubAgentCallData, isMessageEntry } from "./types";
+import { Entry, isMessageEntry } from "./types";
+import { buildResultByCallId, visibleEntries, getResultEntry } from "./entries";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
 import { Paperclip } from "lucide-react";
@@ -134,31 +135,8 @@ function App() {
   }, [sessionId, connectWebSocket]);
 
   // Build lookup: call_id → tool_result/sub_agent_result entry
-  const resultByCallId = new Map<string, Entry>();
-  for (const e of entries) {
-    if (e.kind === "tool_result") {
-      const d = e.data as { call_id: string };
-      resultByCallId.set(d.call_id, e);
-    } else if (e.kind === "sub_agent_result") {
-      const d = e.data as { child_session_id: string };
-      resultByCallId.set(d.child_session_id, e);
-    }
-  }
-
-  const visibleEntries = debugMode
-    ? entries.filter((e) => e.kind !== "tool_result" && e.kind !== "sub_agent_result")
-    : entries.filter((e) => isMessageEntry(e.kind));
-
-  /** Find the result entry that matches a call entry */
-  const getResultEntry = (entry: Entry): Entry | undefined => {
-    if (entry.kind === "tool_call") {
-      return resultByCallId.get((entry.data as ToolCallData).call_id);
-    }
-    if (entry.kind === "sub_agent_call") {
-      return resultByCallId.get((entry.data as SubAgentCallData).child_session_id);
-    }
-    return undefined;
-  };
+  const resultByCallId = buildResultByCallId(entries);
+  const visible = visibleEntries(entries, debugMode);
 
   const clearPendingFile = () => {
     if (pendingFile) {
@@ -291,11 +269,11 @@ function App() {
         {entries.length === 0 && (
           <div className="empty-state">Send a photo of a parking sign to get started</div>
         )}
-        {visibleEntries.map((entry) =>
+        {visible.map((entry) =>
           isMessageEntry(entry.kind) ? (
             <MessageBubble key={entry.id} entry={entry} />
           ) : (
-            <EventCard key={entry.id} entry={entry} resultEntry={getResultEntry(entry)} />
+            <EventCard key={entry.id} entry={entry} resultEntry={getResultEntry(entry, resultByCallId)} />
           )
         )}
         {loading && (
