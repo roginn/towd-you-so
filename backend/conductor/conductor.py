@@ -2,11 +2,12 @@ import asyncio
 import logging
 import uuid
 
-from conductor.registry import push_to_client
+from agent.orchestrator import continue_session
+from conductor.registry import mark_batch_done, push_to_client
 from conductor.tool_executor import execute_tool
 from db.database import get_db
 from db.models import EntryKind, EntryStatus
-from db.repository import append_entry, get_entry, get_session_entries, mark_entry_status
+from db.repository import append_entry, get_entry, mark_entry_status
 from interface.models import entry_to_wire
 
 logger = logging.getLogger(__name__)
@@ -54,8 +55,9 @@ async def _process_entry(session_id: uuid.UUID, entry_id: uuid.UUID) -> None:
             {"type": "status", "entry_id": str(entry_id), "status": "done"},
         )
 
-        # Re-trigger orchestrator only when all tool calls have results
-        await _maybe_continue(session_id)
+        # Re-trigger orchestrator when all tool calls in this batch are done
+        if mark_batch_done(session_id, entry.data["call_id"]):
+            asyncio.create_task(continue_session(session_id))
 
     except Exception:
         logger.exception("Failed to process entry %s", entry_id)
@@ -79,23 +81,5 @@ async def _process_entry(session_id: uuid.UUID, entry_id: uuid.UUID) -> None:
             {"type": "status", "entry_id": str(entry_id), "status": "failed"},
         )
         if entry.kind == EntryKind.TOOL_CALL:
-            await _maybe_continue(session_id)
-
-
-async def _maybe_continue(session_id: uuid.UUID) -> None:
-    """Re-trigger orchestrator only when every tool_call has a matching tool_result."""
-    async with get_db() as db:
-        entries = await get_session_entries(db, session_id)
-
-    call_ids = {
-        e.data["call_id"] for e in entries if e.kind == EntryKind.TOOL_CALL
-    }
-    result_ids = {
-        e.data["call_id"] for e in entries if e.kind == EntryKind.TOOL_RESULT
-    }
-    if call_ids - result_ids:
-        return  # Still waiting on other tool results
-
-    from agent.orchestrator import continue_session
-
-    asyncio.create_task(continue_session(session_id))
+            if mark_batch_done(session_id, entry.data["call_id"]):
+                asyncio.create_task(continue_session(session_id))

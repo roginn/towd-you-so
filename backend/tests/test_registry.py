@@ -5,10 +5,13 @@ import pytest
 
 from conductor.registry import (
     SessionSlot,
+    ToolBatch,
     _slots,
     enqueue_entry,
     get_or_create_slot,
+    mark_batch_done,
     push_to_client,
+    register_batch,
     remove_slot,
     set_websocket,
 )
@@ -65,3 +68,48 @@ def test_remove_slot():
     assert sid in _slots
     remove_slot(sid)
     assert sid not in _slots
+
+
+# --- ToolBatch tests ---
+
+
+def test_tool_batch_single():
+    batch = ToolBatch(["c1"])
+    assert batch.mark_done("c1") is True
+
+
+def test_tool_batch_multiple():
+    batch = ToolBatch(["c1", "c2", "c3"])
+    assert batch.mark_done("c1") is False
+    assert batch.mark_done("c2") is False
+    assert batch.mark_done("c3") is True
+
+
+def test_tool_batch_pending_tracks_ids():
+    batch = ToolBatch(["c1", "c2"])
+    assert batch.pending == {"c1", "c2"}
+    batch.mark_done("c1")
+    assert batch.pending == {"c2"}
+
+
+def test_register_and_mark_batch_done():
+    sid = uuid.uuid4()
+    register_batch(sid, ["c1", "c2"])
+    assert mark_batch_done(sid, "c1") is False
+    assert mark_batch_done(sid, "c2") is True
+    # Batch should be cleared after completion
+    slot = get_or_create_slot(sid)
+    assert slot.batch is None
+
+
+def test_mark_batch_done_no_batch():
+    sid = uuid.uuid4()
+    get_or_create_slot(sid)
+    # No batch registered — should return False
+    assert mark_batch_done(sid, "c1") is False
+
+
+def test_mark_batch_done_no_slot():
+    sid = uuid.uuid4()
+    # No slot at all — should return False
+    assert mark_batch_done(sid, "c1") is False
