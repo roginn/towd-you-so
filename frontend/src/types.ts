@@ -13,6 +13,7 @@ export interface Entry {
   kind: EntryKind;
   data: EntryData;
   createdAt: string;
+  status?: "pending" | "running" | "done" | "failed";
 }
 
 // Discriminated data shapes per kind

@@ -304,9 +304,23 @@ body {
   letter-spacing: 0.04em;
 }
 
+.event-status {
+  font-size: 0.75rem;
+}
+
 .event-expand {
   margin-left: auto;
   font-size: 0.65rem;
+  color: #aaa;
+}
+
+.event-result-divider {
+  margin: 6px 0 2px;
+  padding: 0 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: #aaa;
 }
 

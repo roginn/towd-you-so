@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Entry, isMessageEntry } from "./types";
+import { Entry, ToolCallData, SubAgentCallData, isMessageEntry } from "./types";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
 
@@ -41,6 +41,7 @@ function App() {
               kind: e.kind,
               data: e.data,
               createdAt: e.created_at,
+              status: e.status,
             }))
           );
         }
@@ -79,6 +80,7 @@ function App() {
             kind: e.kind,
             data: e.data,
             createdAt: e.created_at,
+            status: e.status,
           };
           setEntries((prev) => {
             // Replace if entry already exists (status update), otherwise append
@@ -89,6 +91,18 @@ function App() {
               return updated;
             }
             return [...prev, entry];
+          });
+        }
+
+        if (msg.type === "status") {
+          setEntries((prev) => {
+            const idx = prev.findIndex((p) => p.id === msg.entry_id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], status: msg.status };
+              return updated;
+            }
+            return prev;
           });
         }
 
@@ -118,9 +132,32 @@ function App() {
     };
   }, [sessionId, connectWebSocket]);
 
+  // Build lookup: call_id → tool_result/sub_agent_result entry
+  const resultByCallId = new Map<string, Entry>();
+  for (const e of entries) {
+    if (e.kind === "tool_result") {
+      const d = e.data as { call_id: string };
+      resultByCallId.set(d.call_id, e);
+    } else if (e.kind === "sub_agent_result") {
+      const d = e.data as { child_session_id: string };
+      resultByCallId.set(d.child_session_id, e);
+    }
+  }
+
   const visibleEntries = debugMode
-    ? entries
+    ? entries.filter((e) => e.kind !== "tool_result" && e.kind !== "sub_agent_result")
     : entries.filter((e) => isMessageEntry(e.kind));
+
+  /** Find the result entry that matches a call entry */
+  const getResultEntry = (entry: Entry): Entry | undefined => {
+    if (entry.kind === "tool_call") {
+      return resultByCallId.get((entry.data as ToolCallData).call_id);
+    }
+    if (entry.kind === "sub_agent_call") {
+      return resultByCallId.get((entry.data as SubAgentCallData).child_session_id);
+    }
+    return undefined;
+  };
 
   const clearPendingFile = () => {
     if (pendingFile) {
@@ -257,7 +294,7 @@ function App() {
           isMessageEntry(entry.kind) ? (
             <MessageBubble key={entry.id} entry={entry} />
           ) : (
-            <EventCard key={entry.id} entry={entry} />
+            <EventCard key={entry.id} entry={entry} resultEntry={getResultEntry(entry)} />
           )
         )}
         {loading && (
