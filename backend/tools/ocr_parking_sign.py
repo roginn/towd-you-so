@@ -33,6 +33,13 @@ DEFINITION = {
 
 register(DEFINITION, sys.modules[__name__])
 
+ROBOFLOW_WORKSPACE = "robolook"
+ROBOFLOW_WORKFLOW_ID = "parking-sign"
+ROBOFLOW_WORKFLOW_URL = (
+    f"https://detect.roboflow.com/infer/workflows/"
+    f"{ROBOFLOW_WORKSPACE}/{ROBOFLOW_WORKFLOW_ID}"
+)
+
 
 async def run(*, file_id: str, **kwargs) -> dict:
     """Read image from DB/disk, send to Roboflow workflow, return OCR results."""
@@ -44,7 +51,6 @@ async def run(*, file_id: str, **kwargs) -> dict:
         if not uploaded:
             return {"error": f"File not found: {file_id}"}
         storage_key = uploaded.storage_key
-        mime_type = uploaded.mime_type
 
     # 2. Read image bytes from disk
     storage = LocalFileStorageBackend()
@@ -66,13 +72,13 @@ async def run(*, file_id: str, **kwargs) -> dict:
         },
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(settings.ROBOFLOW_WORKFLOW_URL, json=payload)
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(ROBOFLOW_WORKFLOW_URL, json=payload)
         resp.raise_for_status()
         result = resp.json()
 
     # 4. Extract sign text strings from workflow output
-    # The workflow returns {"outputs": [{"signs": ["text1", "text2", ...]}]}
+    # Response: {"outputs": [{"open_ai": ["text1", "text2", ...], "detection": {...}}]}
     outputs = result.get("outputs", [{}])
-    signs = outputs[0].get("signs", []) if outputs else []
+    signs = outputs[0].get("open_ai", []) if outputs else []
     return {"signs": signs}
