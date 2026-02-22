@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi import HTTPException
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -103,6 +104,31 @@ async def get_entries(session_id: uuid.UUID):
             raise HTTPException(status_code=404, detail="Session not found")
         entries = await get_session_entries(db, session_id)
     return [entry_to_wire(e)["entry"] for e in entries]
+
+
+# --- Settings ---
+
+
+class DateTimeOverrideRequest(BaseModel):
+    datetime: str | None = None
+
+
+@app.post("/api/settings/datetime-override")
+async def set_datetime_override(body: DateTimeOverrideRequest):
+    from datetime import datetime as dt, timezone
+    from tools.time_utils import set_override, clear_override
+
+    if body.datetime is None:
+        clear_override()
+        return {"ok": True, "datetime": None}
+
+    try:
+        parsed = dt.fromisoformat(body.datetime).replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid datetime format")
+
+    set_override(parsed)
+    return {"ok": True, "datetime": parsed.isoformat()}
 
 
 # --- WebSocket ---

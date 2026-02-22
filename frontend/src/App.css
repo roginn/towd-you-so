@@ -458,6 +458,39 @@ body {
   50% { opacity: 1; }
 }
 
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #fff;
+  z-index: 2000;
+  animation: toast-slide-up 0.25s ease-out;
+}
+
+.toast-success {
+  background: #34c759;
+}
+
+.toast-error {
+  background: #ff3b30;
+}
+
+@keyframes toast-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 @media (max-width: 600px) {
   .app {
     max-width: 100%;

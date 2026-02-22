@@ -18,7 +18,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
-  const [simDateTime, setSimDateTime] = useState("");
+  const [simDateTime, setSimDateTime] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
+  const [overrideDateTime, setOverrideDateTime] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
   const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
@@ -27,6 +33,40 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingMessageRef = useRef<{ content: string; file_id?: string } | null>(null);
+
+  // Send datetime override to backend
+  const sendDateTimeOverride = useCallback(async (dt: string | null) => {
+    try {
+      const res = await fetch(`${API_BASE}/settings/datetime-override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ datetime: dt }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setToast({
+        message: dt ? `Override set: ${dt.replace("T", " ")}` : "Override cleared",
+        type: "success",
+      });
+    } catch {
+      setToast({ message: "Failed to set datetime override", type: "error" });
+    }
+  }, []);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // Sync simDateTime changes when override is active
+  const prevSimRef = useRef(simDateTime);
+  useEffect(() => {
+    if (prevSimRef.current !== simDateTime && overrideDateTime) {
+      sendDateTimeOverride(simDateTime);
+    }
+    prevSimRef.current = simDateTime;
+  }, [simDateTime, overrideDateTime, sendDateTimeOverride]);
 
   // Scroll to bottom when entries or streaming state change
   useEffect(() => {
@@ -308,12 +348,26 @@ function App() {
         </div>
         <div className="config-row">
           <span className="config-label">Sim. Date</span>
-          <input
-            type="datetime-local"
-            className="config-datetime"
-            value={simDateTime}
-            onChange={(e) => setSimDateTime(e.target.value)}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="datetime-local"
+              className="config-datetime"
+              value={simDateTime}
+              onChange={(e) => setSimDateTime(e.target.value)}
+            />
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={overrideDateTime}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setOverrideDateTime(on);
+                  sendDateTimeOverride(on ? simDateTime : null);
+                }}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
         </div>
         <div className="config-section-title">Memories</div>
         <div className="config-memories-placeholder">No memories yet</div>
@@ -394,6 +448,9 @@ function App() {
           Send
         </button>
       </form>
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>{toast.message}</div>
+      )}
     </div>
   );
 }
