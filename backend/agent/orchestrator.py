@@ -10,6 +10,7 @@ from interface.models import entry_to_wire
 
 from agent.llm import (
     build_llm_messages,
+    build_responses_input,
     call_llm,
     call_llm_streaming,
     ContentDelta,
@@ -68,7 +69,7 @@ async def continue_session(session_id: uuid.UUID) -> None:
     async with get_db() as db:
         entries = await get_session_entries(db, session_id)
 
-    messages = build_llm_messages(entries, SYSTEM_PROMPT)
+    messages = build_responses_input(entries, SYSTEM_PROMPT)
     tools = _get_tools(ORCHESTRATOR_TOOLS)
 
     try:

@@ -195,3 +195,44 @@ def build_llm_messages(entries: list, system_prompt: str) -> list[dict]:
         # reasoning, sub_agent_call, sub_agent_result are excluded
 
     return messages
+
+
+def build_responses_input(entries: list, system_prompt: str) -> list[dict]:
+    """Map Entry rows to OpenAI Responses API input format.
+
+    Unlike Chat Completions, the Responses API represents tool calls and
+    results as top-level items rather than nested in assistant messages.
+    """
+    items: list[dict] = [{"role": "system", "content": system_prompt}]
+
+    for entry in entries:
+        kind = entry.kind
+        data = entry.data
+
+        if kind == EntryKind.USER_MESSAGE:
+            text = data.get("content", "")
+            if entry.uploaded_file_id:
+                text += f"\n[User attached an image (file_id: {entry.uploaded_file_id})]"
+            items.append({"role": "user", "content": text})
+
+        elif kind == EntryKind.ASSISTANT_MESSAGE:
+            items.append({"role": "assistant", "content": data["content"]})
+
+        elif kind == EntryKind.TOOL_CALL:
+            items.append({
+                "type": "function_call",
+                "name": data["tool_name"],
+                "arguments": json.dumps(data["arguments"]),
+                "call_id": data["call_id"],
+            })
+
+        elif kind == EntryKind.TOOL_RESULT:
+            items.append({
+                "type": "function_call_output",
+                "call_id": data["call_id"],
+                "output": json.dumps(data["result"]),
+            })
+
+        # reasoning, sub_agent_call, sub_agent_result are excluded
+
+    return items
