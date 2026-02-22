@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_MODEL: str = "gpt-5.2"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost/towdyouso"
     UPLOAD_DIR: str = "uploads"
     BASE_URL: str = "http://localhost:8000"

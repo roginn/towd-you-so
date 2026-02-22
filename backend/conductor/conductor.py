@@ -40,13 +40,6 @@ async def _process_entry(session_id: uuid.UUID, entry_id: uuid.UUID) -> None:
             result_kind = EntryKind.TOOL_RESULT
             result_data = {"call_id": entry.data["call_id"], "result": result}
 
-        elif entry.kind == EntryKind.SUB_AGENT_CALL:
-            # Stub: sub-agent execution not yet implemented
-            result_kind = EntryKind.SUB_AGENT_RESULT
-            result_data = {
-                "child_session_id": entry.data.get("child_session_id"),
-                "result": {"message": "Sub-agent not yet implemented"},
-            }
         else:
             return
 
