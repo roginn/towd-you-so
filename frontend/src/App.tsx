@@ -4,7 +4,7 @@ import { Entry, isMessageEntry } from "./types";
 import { buildResultByCallId, visibleEntries, getResultEntry } from "./entries";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Settings } from "lucide-react";
 
 const API_BASE = "/api";
 const WS_BASE = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
@@ -17,16 +17,20 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [simDateTime, setSimDateTime] = useState("");
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
+  const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingMessageRef = useRef<{ content: string; file_id?: string } | null>(null);
 
-  // Scroll to bottom when entries change
+  // Scroll to bottom when entries or streaming state change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [entries, debugMode]);
+  }, [entries, debugMode, streamingReasoning, streamingContent]);
 
   // Load existing entries when navigating to a session
   useEffect(() => {
@@ -74,6 +78,14 @@ function App() {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
+        if (msg.type === "reasoning_delta") {
+          setStreamingReasoning((prev) => (prev ?? "") + msg.text);
+        }
+
+        if (msg.type === "content_delta") {
+          setStreamingContent((prev) => (prev ?? "") + msg.text);
+        }
+
         if (msg.type === "entry") {
           const e = msg.entry;
           const entry: Entry = {
@@ -84,6 +96,13 @@ function App() {
             createdAt: e.created_at,
             status: e.status,
           };
+          // Clear streaming buffers when finalized entries arrive
+          if (entry.kind === "reasoning") {
+            setStreamingReasoning(null);
+          }
+          if (entry.kind === "assistant_message") {
+            setStreamingContent(null);
+          }
           setEntries((prev) => {
             // Replace if entry already exists (status update), otherwise append
             const idx = prev.findIndex((p) => p.id === entry.id);
@@ -109,6 +128,8 @@ function App() {
         }
 
         if (msg.type === "turn_complete") {
+          setStreamingReasoning(null);
+          setStreamingContent(null);
           setLoading(false);
         }
       };
@@ -256,15 +277,38 @@ function App() {
           </svg>
         </button>
         <h1>Tow'd You So</h1>
-        <label className="debug-toggle">
-          <input
-            type="checkbox"
-            checked={debugMode}
-            onChange={(e) => setDebugMode(e.target.checked)}
-          />
-          Debug
-        </label>
+        <button
+          className="config-btn"
+          onClick={() => setConfigOpen((o) => !o)}
+          aria-label="Configuration"
+        >
+          <Settings size={20} />
+        </button>
       </header>
+      <div className={`config-panel${configOpen ? " open" : ""}`}>
+        <div className="config-row">
+          <span className="config-label">Debug</span>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={debugMode}
+              onChange={(e) => setDebugMode(e.target.checked)}
+            />
+            <span className="toggle-slider" />
+          </label>
+        </div>
+        <div className="config-row">
+          <span className="config-label">Sim. Date</span>
+          <input
+            type="datetime-local"
+            className="config-datetime"
+            value={simDateTime}
+            onChange={(e) => setSimDateTime(e.target.value)}
+          />
+        </div>
+        <div className="config-section-title">Memories</div>
+        <div className="config-memories-placeholder">No memories yet</div>
+      </div>
       <div className="messages">
         {entries.length === 0 && (
           <div className="empty-state">Send a photo of a parking sign to get started</div>
@@ -276,7 +320,21 @@ function App() {
             <EventCard key={entry.id} entry={entry} resultEntry={getResultEntry(entry, resultByCallId)} />
           )
         )}
-        {loading && (
+        {debugMode && streamingReasoning && (
+          <div className="event-card streaming">
+            <div className="event-card-header">
+              <span className="event-icon">{"\uD83E\uDDE0"}</span>
+              <span className="event-label">Reasoning</span>
+              <span className="streaming-indicator">{"\u25CF"}</span>
+            </div>
+            <pre className="event-card-body">{streamingReasoning}</pre>
+          </div>
+        )}
+        {streamingContent ? (
+          <div className="message assistant">
+            <div className="bubble">{streamingContent}</div>
+          </div>
+        ) : loading && (
           <div className="message assistant">
             <div className="bubble loading-bubble">
               <span className="dot" />
