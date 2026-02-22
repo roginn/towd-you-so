@@ -8,6 +8,7 @@ from db.models import (
     EntryKind,
     EntryModel,
     EntryStatus,
+    MemoryModel,
     SessionModel,
     UploadedFileModel,
 )
@@ -101,3 +102,39 @@ async def get_uploaded_file_by_storage_key(
         select(UploadedFileModel).where(UploadedFileModel.storage_key == storage_key)
     )
     return result.scalar_one_or_none()
+
+
+# --- Memories ---
+
+
+async def create_memory(db: AsyncSession, content: str) -> MemoryModel:
+    memory = MemoryModel(content=content)
+    db.add(memory)
+    await db.flush()
+    return memory
+
+
+async def update_memory(
+    db: AsyncSession, memory_id: uuid.UUID, content: str
+) -> MemoryModel | None:
+    memory = await db.get(MemoryModel, memory_id)
+    if memory:
+        memory.content = content
+        await db.flush()
+    return memory
+
+
+async def delete_memory(db: AsyncSession, memory_id: uuid.UUID) -> bool:
+    memory = await db.get(MemoryModel, memory_id)
+    if memory:
+        await db.delete(memory)
+        await db.flush()
+        return True
+    return False
+
+
+async def list_memories(db: AsyncSession) -> list[MemoryModel]:
+    result = await db.execute(
+        select(MemoryModel).order_by(MemoryModel.created_at)
+    )
+    return list(result.scalars().all())

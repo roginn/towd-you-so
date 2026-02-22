@@ -23,9 +23,11 @@ from db.database import get_db
 from db.repository import (
     create_session,
     create_uploaded_file,
+    delete_memory,
     get_session,
     get_session_entries,
     get_uploaded_file_by_storage_key,
+    list_memories,
 )
 from interface.models import (
     CreateSessionResponse,
@@ -111,6 +113,29 @@ async def get_entries(session_id: uuid.UUID):
 
 class DateTimeOverrideRequest(BaseModel):
     datetime: str | None = None
+
+
+@app.get("/api/memories")
+async def list_memories_endpoint():
+    async with get_db() as db:
+        memories = await list_memories(db)
+    return [
+        {
+            "id": str(m.id),
+            "content": m.content,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in memories
+    ]
+
+
+@app.delete("/api/memories/{memory_id}")
+async def delete_memory_endpoint(memory_id: uuid.UUID):
+    async with get_db() as db:
+        deleted = await delete_memory(db, memory_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"ok": True}
 
 
 @app.post("/api/settings/datetime-override")

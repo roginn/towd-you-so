@@ -124,29 +124,39 @@ async def call_llm_streaming(
 
 
 async def call_llm(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
-    kwargs = {
+    """Non-streaming LLM call using the Responses API."""
+    kwargs: dict = {
         "model": settings.OPENAI_MODEL,
-        "messages": messages,
+        "input": messages,
         "reasoning": {"effort": "medium"},
     }
     if tools:
-        kwargs["tools"] = tools
-    response = await openai_client.chat.completions.create(**kwargs)
-    choice = response.choices[0]
+        kwargs["tools"] = _tools_to_responses_format(tools)
 
-    if choice.finish_reason == "tool_calls" or choice.message.tool_calls:
-        return LLMResponse(
-            tool_calls=[
+    response = await openai_client.responses.create(**kwargs)
+
+    # Collect tool calls and text content from output items
+    tool_calls: list[ToolCallResult] = []
+    content_parts: list[str] = []
+
+    for item in response.output:
+        if item.type == "function_call":
+            tool_calls.append(
                 ToolCallResult(
-                    call_id=tc.id,
-                    tool_name=tc.function.name,
-                    arguments=json.loads(tc.function.arguments),
+                    call_id=item.call_id,
+                    tool_name=item.name,
+                    arguments=json.loads(item.arguments),
                 )
-                for tc in choice.message.tool_calls
-            ]
-        )
+            )
+        elif item.type == "message":
+            for part in item.content:
+                if hasattr(part, "text"):
+                    content_parts.append(part.text)
 
-    return LLMResponse(content=choice.message.content or "")
+    if tool_calls:
+        return LLMResponse(tool_calls=tool_calls)
+
+    return LLMResponse(content="".join(content_parts) or "")
 
 
 def build_llm_messages(entries: list, system_prompt: str) -> list[dict]:

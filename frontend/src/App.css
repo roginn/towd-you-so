@@ -85,8 +85,9 @@ body {
 }
 
 .config-panel.open {
-  max-height: 400px;
+  max-height: 500px;
   padding: 16px 20px;
+  overflow-y: auto;
 }
 
 .config-row {
@@ -127,6 +128,47 @@ body {
   color: #aaa;
   padding: 8px 0;
   font-style: italic;
+}
+
+.config-memories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.config-memory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.config-memory-text {
+  font-size: 0.85rem;
+  color: #333;
+  flex: 1;
+  min-width: 0;
+}
+
+.config-memory-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: none;
+  background: none;
+  color: #bbb;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.config-memory-delete:hover {
+  color: #ff3b30;
 }
 
 /* iOS-style toggle switch */

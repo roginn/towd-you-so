@@ -5,7 +5,7 @@ import uuid
 from worker.registry import enqueue_entry, push_to_client, register_batch
 from db.database import get_db
 from db.models import EntryKind
-from db.repository import append_entry, get_session_entries
+from db.repository import append_entry, get_session_entries, list_memories
 from interface.models import entry_to_wire
 
 from agent.llm import (
@@ -29,13 +29,18 @@ SYSTEM_PROMPT = (
     "When you receive a message with an image, call the task_read_parking_sign tool "
     "to extract the sign's rules. Then call get_current_time "
     "to determine the current date, time, and day of week. "
-    "Use both results to give a clear yes/no/conditional answer with a brief explanation."
+    "Use both results to give a clear yes/no/conditional answer with a brief explanation.\n\n"
+    "When the user mentions persistent parking-relevant personal info — such as their city, "
+    "neighborhood, parking permits, vehicle type, work schedule, or regular parking habits — "
+    "call the store_memory tool with the relevant message text so it can be remembered "
+    "for future sessions. Use the existing memories (listed below) to personalize your answers."
 )
 
 ORCHESTRATOR_TOOLS = [
     "task_read_parking_sign",
     "get_current_time",
     "vision",
+    "store_memory",
 ]
 
 
@@ -68,8 +73,17 @@ async def continue_session(session_id: uuid.UUID) -> None:
     """Load all entries, build LLM messages, stream LLM response, write resulting entries."""
     async with get_db() as db:
         entries = await get_session_entries(db, session_id)
+        memories = await list_memories(db)
 
-    messages = build_responses_input(entries, SYSTEM_PROMPT)
+    # Inject existing memories into system prompt
+    prompt = SYSTEM_PROMPT
+    if memories:
+        memories_text = "\n".join(f"- {m.content}" for m in memories)
+        prompt += f"\n\nUser memories:\n{memories_text}"
+    else:
+        prompt += "\n\nUser memories: (none yet)"
+
+    messages = build_responses_input(entries, prompt)
     tools = _get_tools(ORCHESTRATOR_TOOLS)
 
     try:

@@ -4,7 +4,13 @@ import { Entry, isMessageEntry } from "./types";
 import { buildResultByCallId, visibleEntries, getResultEntry } from "./entries";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
-import { Paperclip, Settings } from "lucide-react";
+import { Paperclip, Settings, X } from "lucide-react";
+
+interface Memory {
+  id: string;
+  content: string;
+  created_at: string;
+}
 
 const API_BASE = "/api";
 const WS_BASE = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
@@ -25,6 +31,7 @@ function App() {
   });
   const [overrideDateTime, setOverrideDateTime] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
   const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
@@ -51,6 +58,30 @@ function App() {
       setToast({ message: "Failed to set datetime override", type: "error" });
     }
   }, []);
+
+  // Fetch memories from backend
+  const fetchMemories = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/memories`);
+      if (res.ok) setMemories(await res.json());
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Load memories on mount
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
+
+  const deleteMemory = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/memories/${id}`, { method: "DELETE" });
+      if (res.ok) setMemories((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      // ignore
+    }
+  };
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -172,6 +203,7 @@ function App() {
           setStreamingReasoning(null);
           setStreamingContent(null);
           setLoading(false);
+          fetchMemories();
         }
       };
 
@@ -183,7 +215,7 @@ function App() {
         setLoading(false);
       };
     },
-    []
+    [fetchMemories]
   );
 
   // Connect WebSocket when sessionId is available
@@ -370,7 +402,24 @@ function App() {
           </div>
         </div>
         <div className="config-section-title">Memories</div>
-        <div className="config-memories-placeholder">No memories yet</div>
+        {memories.length === 0 ? (
+          <div className="config-memories-placeholder">No memories yet</div>
+        ) : (
+          <div className="config-memories-list">
+            {memories.map((m) => (
+              <div key={m.id} className="config-memory-item">
+                <span className="config-memory-text">{m.content}</span>
+                <button
+                  className="config-memory-delete"
+                  onClick={() => deleteMemory(m.id)}
+                  aria-label="Delete memory"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="messages">
         {entries.length === 0 && (
