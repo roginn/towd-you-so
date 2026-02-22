@@ -3,8 +3,8 @@ import logging
 import uuid
 
 from agent.orchestrator import continue_session
-from conductor.registry import mark_batch_done, push_to_client
-from conductor.tool_executor import execute_tool
+from worker.registry import mark_batch_done, push_to_client
+from worker.tool_executor import execute_tool
 from db.database import get_db
 from db.models import EntryKind, EntryStatus
 from db.repository import append_entry, get_entry, mark_entry_status
@@ -13,14 +13,14 @@ from interface.models import entry_to_wire
 logger = logging.getLogger(__name__)
 
 
-async def run_conductor(session_id: uuid.UUID, queue: asyncio.Queue) -> None:
+async def run_worker(session_id: uuid.UUID, queue: asyncio.Queue) -> None:
     """Per-session async loop. Processes pending executable entries."""
     while True:
         entry_id: uuid.UUID = await queue.get()
         try:
             await _process_entry(session_id, entry_id)
         except Exception:
-            logger.exception("Conductor error processing entry %s", entry_id)
+            logger.exception("Worker error processing entry %s", entry_id)
 
 
 async def _process_entry(session_id: uuid.UUID, entry_id: uuid.UUID) -> None:

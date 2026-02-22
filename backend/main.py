@@ -11,8 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 
 from agent.orchestrator import start_session
-from conductor.conductor import run_conductor
-from conductor.registry import (
+from worker.worker import run_worker
+from worker.registry import (
     get_or_create_slot,
     remove_slot,
     set_websocket,
@@ -120,7 +120,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
 
     slot = get_or_create_slot(session_id)
     set_websocket(session_id, websocket)
-    conductor_task = asyncio.create_task(run_conductor(session_id, slot.queue))
+    worker_task = asyncio.create_task(run_worker(session_id, slot.queue))
 
     try:
         while True:
@@ -140,6 +140,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: uuid.UUID):
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for session %s", session_id)
     finally:
-        conductor_task.cancel()
+        worker_task.cancel()
         set_websocket(session_id, None)
         remove_slot(session_id)

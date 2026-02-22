@@ -98,7 +98,7 @@ backend/
 
 ### 2.2.2 Tool Execution Model
 
-Tools receive **only** the explicit parameters the LLM provides in its `tool_calls` arguments — no implicit context. The conductor is a dumb executor: it dispatches `tool_name` + `arguments` and writes the result.
+Tools receive **only** the explicit parameters the LLM provides in its `tool_calls` arguments — no implicit context. The worker is a dumb executor: it dispatches `tool_name` + `arguments` and writes the result.
 
 - Tools must declare all required inputs in their function `parameters` schema so the LLM knows to supply them.
 - The LLM is responsible for extracting values (e.g., `file_id` from the user message) and passing them as tool arguments.

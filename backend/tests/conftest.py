@@ -52,10 +52,10 @@ async def override_get_db(db_session: AsyncSession, monkeypatch):
     import db.database
     import main
     import agent.orchestrator
-    import conductor.conductor
+    import worker.worker
 
     # Patch get_db on every module that imports it directly
     monkeypatch.setattr(db.database, "get_db", _fake_get_db)
     monkeypatch.setattr(main, "get_db", _fake_get_db)
     monkeypatch.setattr(agent.orchestrator, "get_db", _fake_get_db)
-    monkeypatch.setattr(conductor.conductor, "get_db", _fake_get_db)
+    monkeypatch.setattr(worker.worker, "get_db", _fake_get_db)

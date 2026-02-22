@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from conductor.registry import enqueue_entry, push_to_client, register_batch
+from worker.registry import enqueue_entry, push_to_client, register_batch
 from db.database import get_db
 from db.models import EntryKind
 from db.repository import append_entry, get_session_entries

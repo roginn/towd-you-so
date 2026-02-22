@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from conductor.registry import (
+from worker.registry import (
     SessionSlot,
     ToolBatch,
     _slots,

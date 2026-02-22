@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from conductor.tool_executor import execute_tool
+from worker.tool_executor import execute_tool
 
 
 @pytest.mark.asyncio
