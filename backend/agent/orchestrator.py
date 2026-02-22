@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 
@@ -7,7 +8,16 @@ from db.models import EntryKind
 from db.repository import append_entry, get_session_entries
 from interface.models import entry_to_wire
 
-from agent.llm import build_llm_messages, call_llm
+from agent.llm import (
+    build_llm_messages,
+    call_llm,
+    call_llm_streaming,
+    ContentDelta,
+    ReasoningDelta,
+    StreamDone,
+    ToolCallDelta,
+    ToolCallResult,
+)
 from tools import TOOL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
@@ -54,16 +64,42 @@ async def start_session(
 
 
 async def continue_session(session_id: uuid.UUID) -> None:
-    """Load all entries, build LLM messages, call LLM, write resulting entries."""
+    """Load all entries, build LLM messages, stream LLM response, write resulting entries."""
     async with get_db() as db:
         entries = await get_session_entries(db, session_id)
 
     messages = build_llm_messages(entries, SYSTEM_PROMPT)
+    tools = _get_tools(ORCHESTRATOR_TOOLS)
 
     try:
-        llm_response = await call_llm(messages, tools=_get_tools(ORCHESTRATOR_TOOLS))
+        # Accumulators for the stream
+        reasoning_text = ""
+        content_text = ""
+        # Tool calls accumulator: index -> {call_id, tool_name, arguments_json}
+        tool_calls_acc: dict[int, dict] = {}
+
+        async for event in call_llm_streaming(messages, tools=tools):
+            if isinstance(event, ReasoningDelta):
+                reasoning_text += event.text
+                await push_to_client(session_id, {"type": "reasoning_delta", "text": event.text})
+
+            elif isinstance(event, ContentDelta):
+                content_text += event.text
+                await push_to_client(session_id, {"type": "content_delta", "text": event.text})
+
+            elif isinstance(event, ToolCallDelta):
+                tc = tool_calls_acc.setdefault(event.index, {"call_id": "", "tool_name": "", "arguments_json": ""})
+                if event.call_id:
+                    tc["call_id"] = event.call_id
+                if event.tool_name:
+                    tc["tool_name"] = event.tool_name
+                tc["arguments_json"] += event.arguments_chunk
+
+            elif isinstance(event, StreamDone):
+                pass  # handled below
+
     except Exception:
-        logger.exception("LLM call failed for session %s", session_id)
+        logger.exception("LLM streaming failed for session %s", session_id)
         async with get_db() as db:
             entry = await append_entry(
                 db,
@@ -75,9 +111,29 @@ async def continue_session(session_id: uuid.UUID) -> None:
         await push_to_client(session_id, {"type": "turn_complete"})
         return
 
-    if llm_response.tool_calls:
-        register_batch(session_id, [tc.call_id for tc in llm_response.tool_calls])
-        for tc in llm_response.tool_calls:
+    # Persist reasoning if received
+    if reasoning_text:
+        async with get_db() as db:
+            entry = await append_entry(
+                db, session_id, EntryKind.REASONING, {"content": reasoning_text}
+            )
+        await push_to_client(session_id, entry_to_wire(entry))
+
+    # Handle tool calls
+    if tool_calls_acc:
+        tool_call_results = []
+        for idx in sorted(tool_calls_acc):
+            tc = tool_calls_acc[idx]
+            tool_call_results.append(
+                ToolCallResult(
+                    call_id=tc["call_id"],
+                    tool_name=tc["tool_name"],
+                    arguments=json.loads(tc["arguments_json"]),
+                )
+            )
+
+        register_batch(session_id, [tc.call_id for tc in tool_call_results])
+        for tc in tool_call_results:
             tool_data = {
                 "call_id": tc.call_id,
                 "tool_name": tc.tool_name,
@@ -89,13 +145,13 @@ async def continue_session(session_id: uuid.UUID) -> None:
                 )
             await push_to_client(session_id, entry_to_wire(entry))
             enqueue_entry(session_id, entry.id)
-    else:
+    elif content_text:
         async with get_db() as db:
             entry = await append_entry(
                 db,
                 session_id,
                 EntryKind.ASSISTANT_MESSAGE,
-                {"content": llm_response.content},
+                {"content": content_text},
             )
         await push_to_client(session_id, entry_to_wire(entry))
         await push_to_client(session_id, {"type": "turn_complete"})

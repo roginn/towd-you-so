@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from openai import AsyncOpenAI
@@ -10,6 +11,7 @@ from db.models import EntryKind
 logger = logging.getLogger(__name__)
 
 openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
 
 @dataclass
 class ToolCallResult:
@@ -24,8 +26,109 @@ class LLMResponse:
     tool_calls: list[ToolCallResult] | None = None
 
 
+# --- Streaming delta types ---
+
+
+@dataclass
+class ReasoningDelta:
+    text: str
+
+
+@dataclass
+class ContentDelta:
+    text: str
+
+
+@dataclass
+class ToolCallDelta:
+    index: int
+    call_id: str | None = None
+    tool_name: str | None = None
+    arguments_chunk: str = ""
+
+
+@dataclass
+class StreamDone:
+    finish_reason: str
+
+
+type StreamEvent = ReasoningDelta | ContentDelta | ToolCallDelta | StreamDone
+
+
+def _tools_to_responses_format(tools: list[dict]) -> list[dict]:
+    """Convert Chat Completions tool format to Responses API format."""
+    result = []
+    for t in tools:
+        fn = t["function"]
+        result.append({
+            "type": "function",
+            "name": fn["name"],
+            "description": fn.get("description", ""),
+            "parameters": fn.get("parameters", {}),
+        })
+    return result
+
+
+async def call_llm_streaming(
+    messages: list[dict], tools: list[dict] | None = None
+) -> AsyncIterator[StreamEvent]:
+    """Async generator yielding streaming events via the Responses API."""
+    kwargs: dict = {
+        "model": settings.OPENAI_MODEL,
+        "input": messages,
+        "reasoning": {"effort": "medium", "summary": "detailed"},
+        "stream": True,
+    }
+    if tools:
+        kwargs["tools"] = _tools_to_responses_format(tools)
+
+    stream = await openai_client.responses.create(**kwargs)
+
+    # Track tool calls by output_index so we can emit ToolCallDelta with call_id/name
+    pending_tool_calls: dict[int, dict] = {}
+
+    async for event in stream:
+        etype = event.type
+
+        # Reasoning summary deltas
+        if etype == "response.reasoning_summary_text.delta":
+            yield ReasoningDelta(text=event.delta)
+
+        # Content text deltas
+        elif etype == "response.output_text.delta":
+            yield ContentDelta(text=event.delta)
+
+        # Tool call: item added with name and call_id
+        elif etype == "response.output_item.added":
+            item = event.item
+            if getattr(item, "type", None) == "function_call":
+                idx = event.output_index
+                pending_tool_calls[idx] = {
+                    "call_id": item.call_id,
+                    "tool_name": item.name,
+                }
+                yield ToolCallDelta(
+                    index=idx,
+                    call_id=item.call_id,
+                    tool_name=item.name,
+                )
+
+        # Tool call arguments delta
+        elif etype == "response.function_call_arguments.delta":
+            idx = event.output_index
+            yield ToolCallDelta(index=idx, arguments_chunk=event.delta)
+
+        # Stream complete
+        elif etype == "response.completed":
+            yield StreamDone(finish_reason="stop")
+
+
 async def call_llm(messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
-    kwargs = {"model": settings.OPENAI_MODEL, "messages": messages}
+    kwargs = {
+        "model": settings.OPENAI_MODEL,
+        "messages": messages,
+        "reasoning": {"effort": "medium"},
+    }
     if tools:
         kwargs["tools"] = tools
     response = await openai_client.chat.completions.create(**kwargs)
@@ -77,7 +180,7 @@ def build_llm_messages(entries: list, system_prompt: str) -> list[dict]:
                 messages[-1]["tool_calls"].append(tc_obj)
             else:
                 messages.append(
-                    {"role": "assistant", "content": None, "tool_calls": [tc_obj]}
+                    {"role": "assistant", "content": "", "tool_calls": [tc_obj]}
                 )
 
         elif kind == EntryKind.TOOL_RESULT:

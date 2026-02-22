@@ -23,6 +23,7 @@ function App() {
   const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingMessageRef = useRef<{ content: string; file_id?: string } | null>(null);
@@ -269,6 +270,7 @@ function App() {
             setLoading(false);
             clearPendingFile();
             navigate("/");
+            setTimeout(() => inputRef.current?.focus(), 0);
           }}
           aria-label="New chat"
         >
@@ -276,7 +278,14 @@ function App() {
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
-        <h1>Tow'd You So</h1>
+        <h1 onClick={() => {
+          wsRef.current?.close();
+          setEntries([]);
+          setInput("");
+          setLoading(false);
+          clearPendingFile();
+          navigate("/");
+        }} style={{ cursor: "pointer" }}>Tow'd You So</h1>
         <button
           className="config-btn"
           onClick={() => setConfigOpen((o) => !o)}
@@ -374,6 +383,7 @@ function App() {
           <Paperclip size={20} />
         </button>
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
