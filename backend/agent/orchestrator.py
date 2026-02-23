@@ -50,7 +50,6 @@ SYSTEM_PROMPT = (
 ORCHESTRATOR_TOOLS = [
     "task_read_parking_sign",
     "get_current_time",
-    "vision",
     "store_memory",
     "task_location",
 ]
