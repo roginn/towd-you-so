@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { Entry, isMessageEntry } from "./types";
 import { buildResultByCallId, visibleEntries, getResultEntry } from "./entries";
 import { MessageBubble } from "./components/MessageBubble";
@@ -444,7 +445,7 @@ function App() {
         )}
         {streamingContent ? (
           <div className="message assistant">
-            <div className="bubble">{streamingContent}</div>
+            <div className="bubble"><ReactMarkdown>{streamingContent}</ReactMarkdown></div>
           </div>
         ) : loading && (
           <div className="message assistant">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { Entry, UserMessageData } from "../types";
 
 interface Props {
@@ -30,7 +31,7 @@ export function MessageBubble({ entry }: Props) {
             )}
           </>
         )}
-        {content}
+        {role === "assistant" ? <ReactMarkdown>{content}</ReactMarkdown> : content}
       </div>
     </div>
   );
