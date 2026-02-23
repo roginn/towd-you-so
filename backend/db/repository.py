@@ -24,6 +24,13 @@ async def create_session(
     return session
 
 
+async def list_sessions(db: AsyncSession) -> list[SessionModel]:
+    result = await db.execute(
+        select(SessionModel).order_by(SessionModel.started_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 async def get_session(db: AsyncSession, session_id: uuid.UUID) -> SessionModel | None:
     return await db.get(SessionModel, session_id)
 

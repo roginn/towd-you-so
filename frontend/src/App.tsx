@@ -5,7 +5,8 @@ import { Entry, isMessageEntry } from "./types";
 import { buildResultByCallId, visibleEntries, getResultEntry } from "./entries";
 import { MessageBubble } from "./components/MessageBubble";
 import { EventCard } from "./components/EventCard";
-import { Paperclip, Settings, X } from "lucide-react";
+import { Menu, Paperclip, Settings, X } from "lucide-react";
+import { SessionSidebar } from "./components/SessionSidebar";
 
 interface Memory {
   id: string;
@@ -34,6 +35,7 @@ function App() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const dragCounterRef = useRef(0);
   const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
@@ -376,23 +378,27 @@ function App() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <SessionSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        currentSessionId={sessionId}
+        onNewChat={() => {
+          wsRef.current?.close();
+          setEntries([]);
+          setInput("");
+          setLoading(false);
+          clearPendingFile();
+          navigate("/");
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+      />
       <header className="header">
         <button
           className="new-chat-btn"
-          onClick={() => {
-            wsRef.current?.close();
-            setEntries([]);
-            setInput("");
-            setLoading(false);
-            clearPendingFile();
-            navigate("/");
-            setTimeout(() => inputRef.current?.focus(), 0);
-          }}
-          aria-label="New chat"
+          onClick={() => setSidebarOpen((o) => !o)}
+          aria-label="Toggle session menu"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <Menu size={20} />
         </button>
         <h1 onClick={() => {
           wsRef.current?.close();

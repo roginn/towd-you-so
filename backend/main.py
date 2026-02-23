@@ -26,8 +26,11 @@ from db.repository import (
     delete_memory,
     get_session,
     get_session_entries,
+    get_uploaded_file,
     get_uploaded_file_by_storage_key,
     list_memories,
+    list_parking_sign_locations,
+    list_sessions,
 )
 from interface.models import (
     CreateSessionResponse,
@@ -65,6 +68,19 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 
 
 # --- REST endpoints ---
+
+
+@app.get("/api/sessions")
+async def list_sessions_endpoint():
+    async with get_db() as db:
+        sessions = await list_sessions(db)
+    return [
+        {
+            "id": str(s.id),
+            "started_at": s.started_at.isoformat() + "Z",
+        }
+        for s in sessions
+    ]
 
 
 @app.post("/api/sessions", response_model=CreateSessionResponse)
@@ -154,6 +170,31 @@ async def set_datetime_override(body: DateTimeOverrideRequest):
 
     set_override(parsed)
     return {"ok": True, "datetime": parsed.isoformat()}
+
+
+# --- Parking Signs ---
+
+
+@app.get("/api/parking-signs")
+async def list_parking_signs():
+    async with get_db() as db:
+        locations = await list_parking_sign_locations(db)
+        results = []
+        for loc in locations:
+            uploaded_file = await get_uploaded_file(db, loc.uploaded_file_id)
+            image_url = f"/uploads/{uploaded_file.storage_key}" if uploaded_file else None
+            results.append(
+                {
+                    "id": str(loc.id),
+                    "latitude": loc.latitude,
+                    "longitude": loc.longitude,
+                    "description": loc.description,
+                    "sign_text": loc.sign_text,
+                    "image_url": image_url,
+                    "created_at": loc.created_at.isoformat() + "Z",
+                }
+            )
+    return results
 
 
 # --- WebSocket ---
