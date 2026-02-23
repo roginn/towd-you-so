@@ -71,7 +71,8 @@ export function EventCard({ entry, resultEntry }: Props) {
   const [expanded, setExpanded] = useState(false);
   const meta = EVENT_META[entry.kind] ?? { icon: "?", label: entry.kind };
   const body = formatCallBody(entry.kind, entry.data);
-  const statusIcon = entry.status ? STATUS_INDICATOR[entry.status] : undefined;
+  const effectiveStatus = resultEntry ? "done" : entry.status;
+  const statusIcon = effectiveStatus ? STATUS_INDICATOR[effectiveStatus] : undefined;
   const agentName = entry.kind === "tool_call" ? (entry.data as ToolCallData).agent_name : undefined;
 
   return (
@@ -80,7 +81,7 @@ export function EventCard({ entry, resultEntry }: Props) {
         <span className="event-icon">{meta.icon}</span>
         <span className="event-label">{meta.label}{agentName && agentName !== "orchestrator" ? ` \u00B7 ${agentName}` : ""}</span>
         {statusIcon && (
-          <span className={`event-status event-status-${entry.status}`}>{statusIcon}</span>
+          <span className={`event-status event-status-${effectiveStatus}`}>{statusIcon}</span>
         )}
         <span className="event-expand">{expanded ? "\u25B2" : "\u25BC"}</span>
       </div>
