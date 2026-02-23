@@ -34,6 +34,8 @@ function App() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [pendingFile, setPendingFile] = useState<{ file: File; preview: string } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const [streamingReasoning, setStreamingReasoning] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -249,6 +251,41 @@ function App() {
     e.target.value = "";
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) {
+      setDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    dragCounterRef.current = 0;
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      clearPendingFile();
+      setPendingFile({ file, preview: URL.createObjectURL(file) });
+    }
+  };
+
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
@@ -332,7 +369,13 @@ function App() {
   };
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <header className="header">
         <button
           className="new-chat-btn"
@@ -500,6 +543,11 @@ function App() {
       </form>
       {toast && (
         <div className={`toast toast-${toast.type}`}>{toast.message}</div>
+      )}
+      {dragOver && (
+        <div className="drop-overlay">
+          <div className="drop-overlay-content">Drop image here</div>
+        </div>
       )}
     </div>
   );

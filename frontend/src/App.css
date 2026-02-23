@@ -11,6 +11,7 @@ body {
 }
 
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -389,6 +390,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Drop overlay */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(59, 130, 246, 0.12);
+  border: 3px dashed rgba(59, 130, 246, 0.5);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.drop-overlay-content {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: rgba(59, 130, 246, 0.8);
 }
 
 /* Attach button */
