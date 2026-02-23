@@ -21,11 +21,11 @@ DEFINITION = {
     },
 }
 
-register(DEFINITION, sys.modules[__name__])
+register(DEFINITION, sys.modules[__name__], agent_name="parking_sign_reader")
 
 
-async def run(*, file_id: str, **kwargs) -> dict:
+async def run(*, file_id: str, session_id: uuid.UUID | None = None, call_id: str | None = None, **kwargs) -> dict:
     """Delegate to the parking sign reader sub-agent."""
     from agent.subagents.parking_sign_reader import run_agent
 
-    return await run_agent(uploaded_file_id=uuid.UUID(file_id))
+    return await run_agent(uploaded_file_id=uuid.UUID(file_id), session_id=session_id)

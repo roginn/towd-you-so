@@ -39,6 +39,7 @@ export interface ToolCallData {
   call_id: string;
   tool_name: string;
   arguments: Record<string, unknown>;
+  agent_name?: string;
 }
 
 export interface ToolResultData {
@@ -51,12 +52,12 @@ export interface ReasoningData {
 }
 
 export interface SubAgentCallData {
-  child_session_id: string;
+  call_id: string;
   agent_name: string;
 }
 
 export interface SubAgentResultData {
-  child_session_id: string;
+  call_id: string;
   result: unknown;
 }
 

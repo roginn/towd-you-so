@@ -12,8 +12,8 @@ const assistantMsg = entry("assistant_message", { content: "hi" });
 const toolCall = entry("tool_call", { call_id: "tc1", tool_name: "bash", arguments: {} });
 const toolResult = entry("tool_result", { call_id: "tc1", result: "ok" });
 const reasoning = entry("reasoning", { content: "thinking..." });
-const subCall = entry("sub_agent_call", { child_session_id: "cs1", agent_name: "helper" });
-const subResult = entry("sub_agent_result", { child_session_id: "cs1", result: "done" });
+const subCall = entry("sub_agent_call", { call_id: "cs1", agent_name: "helper" });
+const subResult = entry("sub_agent_result", { call_id: "cs1", result: "done" });
 
 const allEntries = [userMsg, assistantMsg, toolCall, toolResult, reasoning, subCall, subResult];
 
@@ -35,7 +35,7 @@ describe("buildResultByCallId", () => {
     expect(map.get("tc1")).toBe(toolResult);
   });
 
-  it("pairs sub_agent_call with sub_agent_result by child_session_id", () => {
+  it("pairs sub_agent_call with sub_agent_result by call_id", () => {
     const map = buildResultByCallId(allEntries);
     expect(map.get("cs1")).toBe(subResult);
   });

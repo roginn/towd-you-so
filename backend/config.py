@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     BASE_URL: str = "http://localhost:8000"
     ROBOFLOW_API_KEY: str = ""
+    MAPBOX_ACCESS_TOKEN: str = ""
 
     model_config = {"env_file": ".env"}
 

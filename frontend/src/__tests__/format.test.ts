@@ -13,7 +13,7 @@ describe("formatCallBody", () => {
   });
 
   it("formats sub_agent_call as delegation message", () => {
-    const data = { child_session_id: "s1", agent_name: "researcher" };
+    const data = { call_id: "s1", agent_name: "researcher" };
     expect(formatCallBody("sub_agent_call", data)).toBe("Delegating to researcher");
   });
 });
@@ -32,12 +32,12 @@ describe("formatResultBody", () => {
   });
 
   it("returns string result as-is for sub_agent_result", () => {
-    const data = { child_session_id: "s1", result: "done" };
+    const data = { call_id: "s1", result: "done" };
     expect(formatResultBody("sub_agent_result", data)).toBe("done");
   });
 
   it("returns pretty JSON for object result in sub_agent_result", () => {
-    const data = { child_session_id: "s1", result: { status: "complete" } };
+    const data = { call_id: "s1", result: { status: "complete" } };
     expect(formatResultBody("sub_agent_result", data)).toBe(
       JSON.stringify({ status: "complete" }, null, 2),
     );

@@ -1,10 +1,14 @@
 import json
 import logging
+import uuid
 
 from agent.llm import call_llm
 from db.database import get_db
-from db.repository import list_memories
+from db.models import EntryKind
+from db.repository import append_entry, list_memories
+from interface.models import entry_to_wire
 from tools import TOOL_DEFINITIONS, TOOL_REGISTRY
+from worker.registry import push_to_client
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,7 @@ def _get_tools() -> list[dict]:
     return [d for d in TOOL_DEFINITIONS if d["function"]["name"] in MEMORY_MANAGER_TOOLS]
 
 
-async def run_agent(relevant_messages: list[str]) -> dict:
+async def run_agent(relevant_messages: list[str], session_id: uuid.UUID | None = None) -> dict:
     """Run the memory manager subagent with LLM reasoning loop."""
     # Load existing memories
     async with get_db() as db:
@@ -72,12 +76,34 @@ async def run_agent(relevant_messages: list[str]) -> dict:
                     "call_id": tc.call_id,
                 })
 
+                # Write TOOL_CALL entry to DB
+                if session_id:
+                    tool_call_data = {
+                        "call_id": tc.call_id,
+                        "tool_name": tc.tool_name,
+                        "arguments": tc.arguments,
+                        "agent_name": "memory_manager",
+                    }
+                    async with get_db() as db:
+                        tc_entry = await append_entry(db, session_id, EntryKind.TOOL_CALL, tool_call_data)
+                    await push_to_client(session_id, entry_to_wire(tc_entry))
+
                 module = TOOL_REGISTRY.get(tc.tool_name)
                 if module:
                     result = await module.run(**tc.arguments)
                     actions_taken.append(f"{tc.tool_name}: {json.dumps(result)}")
                 else:
                     result = {"error": f"Unknown tool: {tc.tool_name}"}
+
+                # Write TOOL_RESULT entry to DB
+                if session_id:
+                    tool_result_data = {
+                        "call_id": tc.call_id,
+                        "result": result,
+                    }
+                    async with get_db() as db:
+                        tr_entry = await append_entry(db, session_id, EntryKind.TOOL_RESULT, tool_result_data)
+                    await push_to_client(session_id, entry_to_wire(tr_entry))
 
                 messages.append({
                     "type": "function_call_output",

@@ -229,6 +229,10 @@ def build_responses_input(entries: list, system_prompt: str) -> list[dict]:
             items.append({"role": "assistant", "content": data["content"]})
 
         elif kind == EntryKind.TOOL_CALL:
+            # Skip sub-agent internal tool calls — only include orchestrator calls
+            agent = data.get("agent_name")
+            if agent and agent != "orchestrator":
+                continue
             items.append({
                 "type": "function_call",
                 "name": data["tool_name"],
@@ -237,6 +241,15 @@ def build_responses_input(entries: list, system_prompt: str) -> list[dict]:
             })
 
         elif kind == EntryKind.TOOL_RESULT:
+            # Skip results for sub-agent internal tool calls
+            # (their call_ids won't match any orchestrator function_call)
+            # We check if there's a matching function_call in items
+            matching = any(
+                i.get("type") == "function_call" and i.get("call_id") == data["call_id"]
+                for i in items
+            )
+            if not matching:
+                continue
             items.append({
                 "type": "function_call_output",
                 "call_id": data["call_id"],

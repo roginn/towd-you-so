@@ -153,6 +153,7 @@ async def continue_session(session_id: uuid.UUID) -> None:
                 "call_id": tc.call_id,
                 "tool_name": tc.tool_name,
                 "arguments": tc.arguments,
+                "agent_name": "orchestrator",
             }
             async with get_db() as db:
                 entry = await append_entry(

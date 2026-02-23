@@ -1,4 +1,5 @@
 import sys
+import uuid
 
 from tools._registry import register
 
@@ -25,10 +26,10 @@ DEFINITION = {
     },
 }
 
-register(DEFINITION, sys.modules[__name__])
+register(DEFINITION, sys.modules[__name__], agent_name="memory_manager")
 
 
-async def run(*, relevant_messages: list[str], **kwargs) -> dict:
+async def run(*, relevant_messages: list[str], session_id: uuid.UUID | None = None, call_id: str | None = None, **kwargs) -> dict:
     from agent.subagents.memory_manager import run_agent
 
-    return await run_agent(relevant_messages=relevant_messages)
+    return await run_agent(relevant_messages=relevant_messages, session_id=session_id)

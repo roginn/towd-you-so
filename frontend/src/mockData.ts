@@ -36,7 +36,7 @@ export const MOCK_ENTRIES: Entry[] = [
     id: "m4",
     sessionId: SESSION_ID,
     kind: "sub_agent_call",
-    data: { child_session_id: "s2", agent_name: "sign_parser" },
+    data: { call_id: "s2", agent_name: "sign_parser" },
     createdAt: "2026-02-21T14:32:04Z",
   },
   {
@@ -44,7 +44,7 @@ export const MOCK_ENTRIES: Entry[] = [
     sessionId: SESSION_ID,
     kind: "sub_agent_result",
     data: {
-      child_session_id: "s2",
+      call_id: "s2",
       result: {
         rules: [
           { days: "Mon-Fri", time: "8AM-6PM", action: "NO PARKING" },

@@ -8,8 +8,8 @@ export function buildResultByCallId(entries: Entry[]): Map<string, Entry> {
       const d = e.data as { call_id: string };
       map.set(d.call_id, e);
     } else if (e.kind === "sub_agent_result") {
-      const d = e.data as { child_session_id: string };
-      map.set(d.child_session_id, e);
+      const d = e.data as { call_id: string };
+      map.set(d.call_id, e);
     }
   }
   return map;
@@ -31,7 +31,7 @@ export function getResultEntry(
     return resultByCallId.get((entry.data as ToolCallData).call_id);
   }
   if (entry.kind === "sub_agent_call") {
-    return resultByCallId.get((entry.data as SubAgentCallData).child_session_id);
+    return resultByCallId.get((entry.data as SubAgentCallData).call_id);
   }
   return undefined;
 }
