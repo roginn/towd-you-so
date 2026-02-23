@@ -33,7 +33,18 @@ SYSTEM_PROMPT = (
     "When the user mentions persistent parking-relevant personal info — such as their city, "
     "neighborhood, parking permits, vehicle type, work schedule, or regular parking habits — "
     "call the store_memory tool with the relevant message text so it can be remembered "
-    "for future sessions. Use the existing memories (listed below) to personalize your answers."
+    "for future sessions. Use the existing memories (listed below) to personalize your answers.\n\n"
+    "LOCATION FEATURES:\n"
+    "- After reading a parking sign, offer to save its location: "
+    "'Would you like me to save this parking sign? Just tell me approximately where this picture was taken.'\n"
+    "- When the user describes a location (e.g. '20th st between illinois and georgia'), "
+    "call task_location with a task like 'Save this parking sign at: <location>' "
+    "along with the uploaded_file_id and sign_text from the earlier reading.\n"
+    "- When the user asks 'where can I park near X?' or similar, call task_location "
+    "with a search task description like 'Search for parking signs near: <location>'.\n"
+    "- Default search radius is ~1 mile (1600m). If the user asks to expand, include that in the task.\n"
+    "- The location agent returns nearby signs with their rules text — check the current time "
+    "against each sign's rules to tell the user which are viable parking options right now."
 )
 
 ORCHESTRATOR_TOOLS = [
@@ -41,6 +52,7 @@ ORCHESTRATOR_TOOLS = [
     "get_current_time",
     "vision",
     "store_memory",
+    "task_location",
 ]
 
 

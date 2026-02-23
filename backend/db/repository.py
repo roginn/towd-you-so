@@ -9,6 +9,7 @@ from db.models import (
     EntryModel,
     EntryStatus,
     MemoryModel,
+    ParkingSignLocationModel,
     SessionModel,
     UploadedFileModel,
 )
@@ -138,3 +139,43 @@ async def list_memories(db: AsyncSession) -> list[MemoryModel]:
         select(MemoryModel).order_by(MemoryModel.created_at)
     )
     return list(result.scalars().all())
+
+
+# --- Parking Sign Locations ---
+
+
+async def create_parking_sign_location(
+    db: AsyncSession,
+    uploaded_file_id: uuid.UUID,
+    latitude: float,
+    longitude: float,
+    description: str,
+    sign_text: str,
+) -> ParkingSignLocationModel:
+    location = ParkingSignLocationModel(
+        uploaded_file_id=uploaded_file_id,
+        latitude=latitude,
+        longitude=longitude,
+        description=description,
+        sign_text=sign_text,
+    )
+    db.add(location)
+    await db.flush()
+    return location
+
+
+async def list_parking_sign_locations(
+    db: AsyncSession,
+) -> list[ParkingSignLocationModel]:
+    result = await db.execute(
+        select(ParkingSignLocationModel).order_by(
+            ParkingSignLocationModel.created_at
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def get_parking_sign_location(
+    db: AsyncSession, location_id: uuid.UUID
+) -> ParkingSignLocationModel | None:
+    return await db.get(ParkingSignLocationModel, location_id)
